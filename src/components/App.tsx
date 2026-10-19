@@ -1,9 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AuthScreen } from "./AuthScreen";
 import { DailyLog } from "./DailyLog";
+import { LeaguesPanel } from "./LeaguesPanel";
 import { Leaderboard } from "./Leaderboard";
 import { EMPTY_DAY, scoreDay, type DayEntry } from "@/lib/scoring";
+import { supabase } from "@/lib/supabase";
+import { useSession } from "@/lib/useSession";
 
 // Demo values so the first screen isn't empty. Real data replaces these once
 // entries are saved to the database.
@@ -19,9 +23,12 @@ const DEMO_ENTRY: DayEntry = {
 };
 const DEMO_PRIOR_STREAK = 6;
 
-type Tab = "log" | "board";
+type Tab = "log" | "board" | "leagues";
+
+const TITLES: Record<Tab, string> = { log: "Daily log", board: "Leaderboard", leagues: "Leagues" };
 
 export function App() {
+  const { session, ready } = useSession();
   const [tab, setTab] = useState<Tab>("log");
   const [entry, setEntry] = useState<DayEntry>(DEMO_ENTRY);
 
@@ -30,22 +37,34 @@ export function App() {
 
   const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
+  // When the database is connected, people must sign in first.
+  if (supabase && !ready) {
+    return (
+      <div className="shell">
+        <main className="main">
+          <p className="callout">Loading...</p>
+        </main>
+      </div>
+    );
+  }
+  if (supabase && !session) {
+    return <AuthScreen />;
+  }
+
   return (
     <div className="shell">
       <header className="head">
         <div>
-          <div className="kicker">{tab === "log" ? `${today} · Friends League` : "Friends League"}</div>
-          <h1 className="title">{tab === "log" ? "Daily log" : "Leaderboard"}</h1>
+          <div className="kicker">{tab === "log" ? `${today} · Friends League` : "Wellness League"}</div>
+          <h1 className="title">{TITLES[tab]}</h1>
         </div>
         <span className="streak">{DEMO_PRIOR_STREAK + 1}-day streak</span>
       </header>
 
       <main className="main">
-        {tab === "log" ? (
-          <DailyLog entry={entry} score={score} onChange={setEntry} />
-        ) : (
-          <Leaderboard todayTotal={score.total} />
-        )}
+        {tab === "log" && <DailyLog entry={entry} score={score} onChange={setEntry} />}
+        {tab === "board" && <Leaderboard todayTotal={score.total} />}
+        {tab === "leagues" && <LeaguesPanel session={session} />}
       </main>
 
       <nav className="nav" aria-label="Main">
@@ -63,6 +82,14 @@ export function App() {
               <path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7" />
             </svg>
             Leaderboard
+          </button>
+          <button aria-current={tab === "leagues" ? "page" : undefined} onClick={() => setTab("leagues")}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="9" cy="8" r="3.2" />
+              <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
+              <path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M17.5 14a5.5 5.5 0 0 1 3 5" />
+            </svg>
+            Leagues
           </button>
         </div>
       </nav>

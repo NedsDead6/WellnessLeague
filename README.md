@@ -4,12 +4,18 @@ Fantasy-football-style wellness leagues: create a league, invite friends, and lo
 
 ## Status
 
-Milestone 1 (this commit): the daily log and leaderboard screens with the real scoring engine. Friends and standings are sample data, and nothing is saved yet.
+1. Done: daily log and leaderboard screens with the real scoring engine.
+2. In progress: accounts, create a league, invite by link. Needs `supabase/schema.sql` and then `supabase/002_leagues_and_invites.sql` run once in the Supabase SQL Editor.
+3. Next: save daily entries and show real standings.
+4. Later: commissioner scoring settings.
 
-Next milestones:
-2. Accounts, create a league, invite by link (uses `supabase/schema.sql`)
-3. Save daily entries and show real standings
-4. Commissioner scoring settings
+The daily log and the leaderboard standings are still sample data; nothing is saved yet.
+
+## Environment variables
+
+Set these in Vercel (see `.env.example`):
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+Without them the app runs as a demo with no sign-in.
 
 ## Scoring
 
