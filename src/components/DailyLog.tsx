@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CATEGORY_COLORS, GROUP_COLORS, tint } from "@/lib/colors";
+import { GROUP_COLORS, tint } from "@/lib/colors";
 import { addDays, dayOfMonth, dayShortWeekday, dayLong } from "@/lib/dates";
 import { isLogged, type EntryMap } from "@/lib/history";
 import { EMPTY_DAY, type CategoryKey, type DayEntry, type DayScore, type Group } from "@/lib/scoring";
@@ -27,9 +27,9 @@ const GROUPS: { id: Group; title: string; color: string; fields: StepperRow[] }[
     title: "Physical",
     color: GROUP_COLORS.physical,
     fields: [
-      { field: "exerciseMin", category: "exercise", label: "Exercise", sub: "+1 per 15 min, max +12", step: 15, max: 600, unit: "min", decimals: false },
-      { field: "steps", category: "steps", label: "Steps", sub: "1/1000 point per step, max +20", step: 1000, max: 100000, unit: "steps", decimals: false },
-      { field: "sleepHours", category: "sleep", label: "Sleep", sub: "+1 per hr, bonus +1 at 7 hrs, +2 at 8 hrs", step: 0.5, max: 24, unit: "hrs", decimals: true },
+      { field: "exerciseMin", category: "exercise", label: "Exercise", sub: "+1 per 15 min (max 12)", step: 15, max: 600, unit: "min", decimals: false },
+      { field: "steps", category: "steps", label: "Steps", sub: "0.00025 per step (max 20)", step: 1000, max: 100000, unit: "steps", decimals: false },
+      { field: "sleepHours", category: "sleep", label: "Sleep", sub: "+1 per hr, +1 bonus at 7 hrs, +2 at 8 (max 10)", step: 0.5, max: 24, unit: "hrs", decimals: true },
     ],
   },
   {
@@ -37,11 +37,11 @@ const GROUPS: { id: Group; title: string; color: string; fields: StepperRow[] }[
     title: "Mental",
     color: GROUP_COLORS.mental,
     fields: [
-      { field: "meditationMin", category: "meditation", label: "Meditation", sub: "+1 per 15 min, max +8", step: 15, max: 600, unit: "min", decimals: false },
-      { field: "workHours", category: "work", label: "Work", sub: "+1 per hour, max +14", step: 1, max: 24, unit: "hrs", decimals: true },
-      { field: "socialHours", category: "social", label: "Social time", sub: "+1 per hour, max +6", step: 1, max: 24, unit: "hrs", decimals: true },
-      { field: "readingMin", category: "reading", label: "Reading", sub: "+1 per 30 min, max +4", step: 30, max: 1440, unit: "min", decimals: false },
-      { field: "journalEntries", category: "journal", label: "Journaling or gratitude", sub: "+1 per entry, max +3", step: 1, max: 20, unit: "", decimals: false },
+      { field: "meditationMin", category: "meditation", label: "Meditation", sub: "+1 per 15 min (max 8)", step: 15, max: 600, unit: "min", decimals: false },
+      { field: "workHours", category: "work", label: "Work", sub: "+1 per hour (max 14)", step: 1, max: 24, unit: "hrs", decimals: true },
+      { field: "socialHours", category: "social", label: "Social time", sub: "+1 per hour (max 6)", step: 1, max: 24, unit: "hrs", decimals: true },
+      { field: "readingMin", category: "reading", label: "Reading", sub: "+1 per 30 min (max 4)", step: 30, max: 1440, unit: "min", decimals: false },
+      { field: "journalMin", category: "journal", label: "Journaling or gratitude", sub: "+1 per 15 min (max 3)", step: 15, max: 600, unit: "min", decimals: false },
     ],
   },
   {
@@ -49,8 +49,8 @@ const GROUPS: { id: Group; title: string; color: string; fields: StepperRow[] }[
     title: "Spiritual",
     color: GROUP_COLORS.spiritual,
     fields: [
-      { field: "worshipMin", category: "worship", label: "Worship and prayer", sub: "+1 per 15 min, max +8", step: 15, max: 600, unit: "min", decimals: false },
-      { field: "serviceHours", category: "service", label: "Service or volunteering", sub: "+1 per hour, max +4", step: 1, max: 24, unit: "hrs", decimals: true },
+      { field: "worshipMin", category: "worship", label: "Worship and prayer", sub: "+1 per 15 min (max 8)", step: 15, max: 600, unit: "min", decimals: false },
+      { field: "serviceHours", category: "service", label: "Service or volunteering", sub: "+1 per hour (max 4)", step: 1, max: 24, unit: "hrs", decimals: true },
     ],
   },
   {
@@ -193,7 +193,7 @@ export function DailyLog({
                   <div className="row" key={name}>
                     <div className="row-top">
                       <span className="row-label">{name}</span>
-                      <span className="pill" style={pillStyle(CATEGORY_COLORS.meals, points)}>{fmtSigned(points)}</span>
+                      <span className="pill" style={pillStyle(GROUP_COLORS.physical, points)}>{fmtSigned(points)}</span>
                     </div>
                     <div className="row-bottom">
                       <span className="row-sub">0 junk, 1 mixed, 2 healthy</span>
@@ -218,7 +218,7 @@ export function DailyLog({
               <div className="row">
                 <div className="row-top">
                   <span className="row-label">Water</span>
-                  <span className="pill" style={pillStyle(CATEGORY_COLORS.water, entry.water ? 1 : 0)}>{fmtSigned(entry.water ? 1 : 0)}</span>
+                  <span className="pill" style={pillStyle(GROUP_COLORS.physical, entry.water ? 1 : 0)}>{fmtSigned(entry.water ? 1 : 0)}</span>
                 </div>
                 <div className="row-bottom">
                   <span className="row-sub">Daily glass target met</span>
@@ -342,7 +342,7 @@ function Stepper({
     <div className="row">
       <div className="row-top">
         <span className="row-label">{row.label}</span>
-        <span className="pill" style={pillStyle(CATEGORY_COLORS[row.category], points)}>{fmtSigned(points)}</span>
+        <span className="pill" style={pillStyle(GROUP_COLORS[group], points)}>{fmtSigned(points)}</span>
       </div>
       <div className="row-bottom">
         <span className="row-sub">{row.sub}</span>

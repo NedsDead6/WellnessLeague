@@ -1,25 +1,25 @@
 import type { CategoryKey, Group } from "./scoring";
 
-// Slightly neon colors for every scoring category, grouped by hue family:
-// greens and blues for physical, purples and pinks for mental, golds for
-// spiritual, reds for penalties. Used by the daily log and the charts.
+// Each pillar has one neon color (GROUP_COLORS) used for points in the daily
+// log. The chart splits a pillar into shades of the same hue so the stacked
+// columns stay readable: greens physical, purples mental, golds spiritual, reds penalties.
 export const CATEGORY_COLORS: Record<CategoryKey, string> = {
   exercise: "#2bff88",
-  steps: "#00e0c6",
-  meals: "#b8ff3d",
-  sleep: "#3dd5ff",
-  water: "#4d8dff",
-  meditation: "#c47cff",
-  work: "#ff5ccb",
-  social: "#7c83ff",
-  reading: "#ff8fb8",
-  journal: "#dcb0ff",
+  steps: "#19cf75",
+  meals: "#8affc0",
+  sleep: "#12a352",
+  water: "#c2ffe0",
+  meditation: "#b58cff",
+  work: "#8f63f0",
+  social: "#d4b8ff",
+  reading: "#6f45d1",
+  journal: "#e6d6ff",
   worship: "#ffd23d",
-  service: "#ff9f3d",
+  service: "#e0a800",
   screen: "#ff4d6d",
-  drinks: "#ff7a59",
-  weed: "#e8344e",
-  cigarettes: "#ff9a9a",
+  drinks: "#ff7a90",
+  weed: "#d92a4b",
+  cigarettes: "#ffa3b3",
 };
 
 export const BONUS_COLOR = "#e6eeff";

@@ -18,7 +18,7 @@ export interface DayEntry {
   workHours: number;
   socialHours: number;
   readingMin: number;
-  journalEntries: number;
+  journalMin: number;
   worshipMin: number;
   serviceHours: number;
   screenHours: number; // non-work only
@@ -37,7 +37,7 @@ export const EMPTY_DAY: DayEntry = {
   workHours: 0,
   socialHours: 0,
   readingMin: 0,
-  journalEntries: 0,
+  journalMin: 0,
   worshipMin: 0,
   serviceHours: 0,
   screenHours: 0,
@@ -107,7 +107,7 @@ export function sleepPoints(hours: number): number {
 export function categoryPoints(e: DayEntry): CategoryPoints {
   return {
     exercise: capped(e.exerciseMin, 15, 1, 12), // +1 per 15 min, max 12 (3 hours)
-    steps: Math.min(20, round3(Math.max(0, e.steps) / 1000)), // 1/1000 of a point per step, max 20
+    steps: Math.min(20, Math.round(Math.max(0, e.steps) * 0.25) / 1000), // 0.00025 points per step (1 per 4,000), max 20
     meals: e.meals.reduce((sum, grade) => sum + Math.min(2, Math.max(0, grade)), 0),
     sleep: sleepPoints(e.sleepHours),
     water: e.water ? 1 : 0,
@@ -115,7 +115,7 @@ export function categoryPoints(e: DayEntry): CategoryPoints {
     work: capped(e.workHours, 1, 1, 14),
     social: capped(e.socialHours, 1, 1, 6),
     reading: capped(e.readingMin, 30, 1, 4),
-    journal: Math.min(3, Math.max(0, e.journalEntries)),
+    journal: capped(e.journalMin, 15, 1, 3), // +1 per 15 min, max 3
     worship: capped(e.worshipMin, 15, 1, 8),
     service: capped(e.serviceHours, 1, 1, 4),
     screen: -Math.floor(Math.max(0, e.screenHours)),

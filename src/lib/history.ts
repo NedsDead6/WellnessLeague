@@ -31,7 +31,7 @@ export function isLogged(entry: DayEntry | undefined): boolean {
     entry.workHours !== 0 ||
     entry.socialHours !== 0 ||
     entry.readingMin !== 0 ||
-    entry.journalEntries !== 0 ||
+    entry.journalMin !== 0 ||
     entry.worshipMin !== 0 ||
     entry.serviceHours !== 0 ||
     entry.screenHours !== 0 ||
@@ -45,9 +45,12 @@ export function isLogged(entry: DayEntry | undefined): boolean {
 export function normalizeEntry(raw: unknown): DayEntry {
   const source = (raw && typeof raw === "object" ? raw : {}) as Partial<DayEntry>;
   const meals = Array.isArray(source.meals) ? source.meals : EMPTY_DAY.meals;
+  // Journaling used to be counted in entries; it is now minutes (15 per old entry).
+  const legacy = (raw as { journalEntries?: number } | null)?.journalEntries;
   return {
     ...EMPTY_DAY,
     ...source,
+    journalMin: source.journalMin ?? (typeof legacy === "number" ? legacy * 15 : 0),
     meals: [Number(meals[0]) || 0, Number(meals[1]) || 0, Number(meals[2]) || 0],
     water: Boolean(source.water),
   };

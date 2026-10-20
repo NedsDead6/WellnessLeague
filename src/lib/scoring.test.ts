@@ -13,10 +13,16 @@ describe("scoreDay", () => {
     expect(scoreDay({ ...EMPTY_DAY, exerciseMin: 600 }, 0).physical).toBe(12);
   });
 
-  it("gives 1/1000 of a point per step", () => {
-    expect(scoreDay({ ...EMPTY_DAY, steps: 1 }, 0).categories.steps).toBe(0.001);
-    expect(scoreDay({ ...EMPTY_DAY, steps: 16972 }, 0).categories.steps).toBe(16.972);
-    expect(scoreDay({ ...EMPTY_DAY, steps: 50000 }, 0).categories.steps).toBe(20);
+  it("gives 0.00025 points per step, capped at 20", () => {
+    expect(scoreDay({ ...EMPTY_DAY, steps: 4000 }, 0).categories.steps).toBe(1);
+    expect(scoreDay({ ...EMPTY_DAY, steps: 16972 }, 0).categories.steps).toBe(4.243);
+    expect(scoreDay({ ...EMPTY_DAY, steps: 200000 }, 0).categories.steps).toBe(20);
+  });
+
+  it("gives +1 per 15 minutes of journaling, capped at 3", () => {
+    expect(scoreDay({ ...EMPTY_DAY, journalMin: 14 }, 0).categories.journal).toBe(0);
+    expect(scoreDay({ ...EMPTY_DAY, journalMin: 30 }, 0).categories.journal).toBe(2);
+    expect(scoreDay({ ...EMPTY_DAY, journalMin: 120 }, 0).categories.journal).toBe(3);
   });
 
   it("scores sleep 1 per hour, with +1 at 7 hours and +2 at 8", () => {
@@ -38,7 +44,7 @@ describe("scoreDay", () => {
   });
 
   it("adds the balance bonus only with points in all three pillars", () => {
-    const two = { ...EMPTY_DAY, steps: 3000, workHours: 2 };
+    const two = { ...EMPTY_DAY, steps: 12000, workHours: 2 };
     expect(scoreDay(two, 0).balanceBonus).toBe(0);
     expect(scoreDay({ ...two, worshipMin: 15 }, 0).balanceBonus).toBe(2);
   });

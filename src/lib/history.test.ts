@@ -78,7 +78,8 @@ describe("dates", () => {
   });
 });
 
-const walked = (steps: number) => ({ ...EMPTY_DAY, steps });
+// A day worth `n / 1000` points of steps (1 point = 4,000 steps).
+const walked = (n: number) => ({ ...EMPTY_DAY, steps: n * 4 });
 
 describe("history", () => {
   it("treats an all-empty day as not logged", () => {
@@ -91,6 +92,8 @@ describe("history", () => {
   it("fills in missing fields on stored entries", () => {
     const entry = normalizeEntry({ steps: 5000, meals: [2] });
     expect(entry.steps).toBe(5000);
+    expect(normalizeEntry({ journalEntries: 2 }).journalMin).toBe(30);
+    expect(normalizeEntry({ journalMin: 45, journalEntries: 2 }).journalMin).toBe(45);
     expect(entry.meals).toEqual([2, 0, 0]);
     expect(entry.workHours).toBe(0);
     expect(normalizeEntry(null)).toEqual(EMPTY_DAY);
@@ -123,8 +126,8 @@ describe("history", () => {
 
   it("sums a period and splits it by category", () => {
     const entries: EntryMap = {
-      "2026-10-19": { ...EMPTY_DAY, steps: 5000, exerciseMin: 30 },
-      "2026-10-20": { ...EMPTY_DAY, steps: 2000, drinks: 2 },
+      "2026-10-19": { ...EMPTY_DAY, steps: 20000, exerciseMin: 30 },
+      "2026-10-20": { ...EMPTY_DAY, steps: 8000, drinks: 2 },
       "2026-10-27": walked(9000),
     };
     const history = scoreHistory(entries);
