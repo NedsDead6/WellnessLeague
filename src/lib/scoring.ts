@@ -88,40 +88,173 @@ export type CategoryPoints = Record<CategoryKey, number>;
 export const emptyCategoryPoints = (): CategoryPoints =>
   Object.fromEntries(CATEGORIES.map((c) => [c.key, 0])) as CategoryPoints;
 
-const capped = (value: number, perUnit: number, pointsPerUnit: number, maxPoints: number) =>
-  Math.min(maxPoints, Math.floor(Math.max(0, value) / perUnit) * pointsPerUnit);
-
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
+export type RuleKey =
+  | "exercise"
+  | "steps"
+  | "meditation"
+  | "work"
+  | "social"
+  | "reading"
+  | "journal"
+  | "worship"
+  | "service"
+  | "screen"
+  | "drinks"
+  | "weed"
+  | "cigarettes";
+
 /**
- * 1 point per hour slept, up to 8 hours, plus a bonus for a full night:
- * +1 at 7 hours (8 points total) and +2 at 8 hours or more (10 points).
+ * `points` for every `per` units, up to `max` points (null means no cap).
+ * Penalties have negative points. A `smooth` rule pays for partial units too
+ * (steps); the others only pay for each full unit.
  */
-export function sleepPoints(hours: number): number {
+export interface Rule {
+  points: number;
+  per: number;
+  max: number | null;
+  smooth?: boolean;
+}
+
+export interface ScoringRules {
+  rules: Record<RuleKey, Rule>;
+  /** Points for a mixed (1) and a healthy (2) meal. A junk meal (0) earns nothing. */
+  meals: { mixed: number; healthy: number };
+  /** Points per hour up to 8 hours, plus a bonus at 7 and at 8 or more hours. */
+  sleep: { perHour: number; bonus7: number; bonus8: number };
+  water: number;
+  balanceBonus: number;
+  /** Paid on every 7th consecutive logged day. */
+  streakBonus: number;
+}
+
+export const PENALTY_KEYS: RuleKey[] = ["screen", "drinks", "weed", "cigarettes"];
+
+/** The standard scoring. Leagues always use this; people can customize their own copy. */
+export const DEFAULT_RULES: ScoringRules = {
+  rules: {
+    exercise: { points: 1, per: 15, max: 12 },
+    steps: { points: 1, per: 4000, max: 20, smooth: true },
+    meditation: { points: 1, per: 15, max: 8 },
+    work: { points: 1, per: 1, max: 14 },
+    social: { points: 1, per: 1, max: 6 },
+    reading: { points: 1, per: 30, max: 4 },
+    journal: { points: 1, per: 15, max: 3 },
+    worship: { points: 1, per: 15, max: 8 },
+    service: { points: 1, per: 1, max: 4 },
+    screen: { points: -1, per: 1, max: null },
+    drinks: { points: -0.5, per: 1, max: null },
+    weed: { points: -5, per: 1, max: null },
+    cigarettes: { points: -0.5, per: 1, max: null },
+  },
+  meals: { mixed: 1, healthy: 2 },
+  sleep: { perHour: 1, bonus7: 1, bonus8: 2 },
+  water: 1,
+  balanceBonus: 2,
+  streakBonus: 2,
+};
+
+const finite = (value: unknown, fallback: number, min = 0): number =>
+  typeof value === "number" && Number.isFinite(value) && value >= min ? value : fallback;
+
+/** Fills in and cleans up stored rules so a bad or old row can never break scoring. */
+export function normalizeRules(raw: unknown): ScoringRules {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<Record<keyof ScoringRules, any>>;
+  const rules = {} as Record<RuleKey, Rule>;
+  for (const key of Object.keys(DEFAULT_RULES.rules) as RuleKey[]) {
+    const base = DEFAULT_RULES.rules[key];
+    const given = src.rules?.[key] ?? {};
+    const penalty = PENALTY_KEYS.includes(key);
+    const rawPoints = typeof given.points === "number" ? Math.abs(given.points) : Number.NaN;
+    const points = Number.isFinite(rawPoints) ? rawPoints : Math.abs(base.points);
+    const max = penalty
+      ? typeof given.max === "number" && given.max >= 0
+        ? given.max
+        : null
+      : finite(given.max, base.max as number);
+    rules[key] = {
+      points: penalty ? -points : points,
+      per: finite(given.per, base.per, 0.01),
+      max,
+      ...(base.smooth ? { smooth: true } : {}),
+    };
+  }
+  return {
+    rules,
+    meals: {
+      mixed: finite(src.meals?.mixed, DEFAULT_RULES.meals.mixed),
+      healthy: finite(src.meals?.healthy, DEFAULT_RULES.meals.healthy),
+    },
+    sleep: {
+      perHour: finite(src.sleep?.perHour, DEFAULT_RULES.sleep.perHour),
+      bonus7: finite(src.sleep?.bonus7, DEFAULT_RULES.sleep.bonus7),
+      bonus8: finite(src.sleep?.bonus8, DEFAULT_RULES.sleep.bonus8),
+    },
+    water: finite(src.water, DEFAULT_RULES.water),
+    balanceBonus: finite(src.balanceBonus, DEFAULT_RULES.balanceBonus),
+    streakBonus: finite(src.streakBonus, DEFAULT_RULES.streakBonus),
+  };
+}
+
+export const isDefaultRules = (rules: ScoringRules) => JSON.stringify(normalizeRules(rules)) === JSON.stringify(DEFAULT_RULES);
+
+function ruleScore(value: number, rule: Rule): number {
+  const v = Math.max(0, value);
+  const units = rule.smooth ? v / rule.per : Math.floor(v / rule.per);
+  let points = units * rule.points;
+  if (rule.max !== null) points = rule.points >= 0 ? Math.min(rule.max, points) : Math.max(-rule.max, points);
+  return round3(points);
+}
+
+/** Points for a meal graded 0 (junk), 1 (mixed) or 2 (healthy). */
+export function mealPoints(grade: number, rules: ScoringRules = DEFAULT_RULES): number {
+  return grade >= 2 ? rules.meals.healthy : grade >= 1 ? rules.meals.mixed : 0;
+}
+
+export function sleepPoints(hours: number, rules: ScoringRules = DEFAULT_RULES): number {
   const h = Math.max(0, hours);
-  const bonus = h >= 8 ? 2 : h >= 7 ? 1 : 0;
-  return round3(Math.min(h, 8) + bonus);
+  const bonus = h >= 8 ? rules.sleep.bonus8 : h >= 7 ? rules.sleep.bonus7 : 0;
+  return round3(Math.min(h, 8) * rules.sleep.perHour + bonus);
+}
+
+/** The most points each pillar can earn in a day, for progress bars. */
+export function pillarMax(rules: ScoringRules): Record<Pillar, number> {
+  const r = rules.rules;
+  const cap = (key: RuleKey) => r[key].max ?? 0;
+  return {
+    physical:
+      cap("exercise") +
+      cap("steps") +
+      3 * rules.meals.healthy +
+      8 * rules.sleep.perHour +
+      Math.max(rules.sleep.bonus7, rules.sleep.bonus8) +
+      rules.water,
+    mental: cap("meditation") + cap("work") + cap("social") + cap("reading") + cap("journal"),
+    spiritual: cap("worship") + cap("service"),
+  };
 }
 
 /** Points each category earned (or lost) for one day, before any bonuses. */
-export function categoryPoints(e: DayEntry): CategoryPoints {
+export function categoryPoints(e: DayEntry, rules: ScoringRules = DEFAULT_RULES): CategoryPoints {
+  const r = rules.rules;
   return {
-    exercise: capped(e.exerciseMin, 15, 1, 12), // +1 per 15 min, max 12 (3 hours)
-    steps: Math.min(20, Math.round(Math.max(0, e.steps) * 0.25) / 1000), // 0.00025 points per step (1 per 4,000), max 20
-    meals: e.meals.reduce((sum, grade) => sum + Math.min(2, Math.max(0, grade)), 0),
-    sleep: sleepPoints(e.sleepHours),
-    water: e.water ? 1 : 0,
-    meditation: capped(e.meditationMin, 15, 1, 8),
-    work: capped(e.workHours, 1, 1, 14),
-    social: capped(e.socialHours, 1, 1, 6),
-    reading: capped(e.readingMin, 30, 1, 4),
-    journal: capped(e.journalMin, 15, 1, 3), // +1 per 15 min, max 3
-    worship: capped(e.worshipMin, 15, 1, 8),
-    service: capped(e.serviceHours, 1, 1, 4),
-    screen: -Math.floor(Math.max(0, e.screenHours)),
-    drinks: -0.5 * Math.max(0, e.drinks),
-    weed: -5 * Math.max(0, e.weed),
-    cigarettes: -0.5 * Math.max(0, e.cigarettes),
+    exercise: ruleScore(e.exerciseMin, r.exercise),
+    steps: ruleScore(e.steps, r.steps),
+    meals: round3(e.meals.reduce((sum, grade) => sum + mealPoints(grade, rules), 0)),
+    sleep: sleepPoints(e.sleepHours, rules),
+    water: e.water ? rules.water : 0,
+    meditation: ruleScore(e.meditationMin, r.meditation),
+    work: ruleScore(e.workHours, r.work),
+    social: ruleScore(e.socialHours, r.social),
+    reading: ruleScore(e.readingMin, r.reading),
+    journal: ruleScore(e.journalMin, r.journal),
+    worship: ruleScore(e.worshipMin, r.worship),
+    service: ruleScore(e.serviceHours, r.service),
+    screen: ruleScore(e.screenHours, r.screen),
+    drinks: ruleScore(e.drinks, r.drinks),
+    weed: ruleScore(e.weed, r.weed),
+    cigarettes: ruleScore(e.cigarettes, r.cigarettes),
   };
 }
 
@@ -138,10 +271,10 @@ export interface DayScore {
 
 /**
  * @param streakDays Consecutive days logged, counting this one. The streak
- *   bonus (+2) lands on every 7th consecutive day.
+ *   bonus lands on every 7th consecutive day.
  */
-export function scoreDay(e: DayEntry, streakDays: number): DayScore {
-  const categories = categoryPoints(e);
+export function scoreDay(e: DayEntry, streakDays: number, rules: ScoringRules = DEFAULT_RULES): DayScore {
+  const categories = categoryPoints(e, rules);
   const sumOf = (group: Group) =>
     CATEGORIES.filter((c) => c.group === group).reduce((sum, c) => sum + categories[c.key], 0);
 
@@ -150,8 +283,8 @@ export function scoreDay(e: DayEntry, streakDays: number): DayScore {
   const spiritual = round3(sumOf("spiritual"));
   const penalties = round3(sumOf("penalty"));
 
-  const balanceBonus = physical > 0 && mental > 0 && spiritual > 0 ? 2 : 0;
-  const streakBonus = streakDays > 0 && streakDays % 7 === 0 ? 2 : 0;
+  const balanceBonus = physical > 0 && mental > 0 && spiritual > 0 ? rules.balanceBonus : 0;
+  const streakBonus = streakDays > 0 && streakDays % 7 === 0 ? rules.streakBonus : 0;
   const total = round3(physical + mental + spiritual + penalties + balanceBonus + streakBonus);
 
   return { physical, mental, spiritual, penalties, balanceBonus, streakBonus, total, categories };

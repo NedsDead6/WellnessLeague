@@ -6,6 +6,7 @@ import {
   type Period,
 } from "./dates";
 import {
+  DEFAULT_RULES,
   EMPTY_DAY,
   emptyCategoryPoints,
   scoreDay,
@@ -13,6 +14,7 @@ import {
   type CategoryPoints,
   type DayEntry,
   type DayScore,
+  type ScoringRules,
 } from "./scoring";
 
 /** Saved entries keyed by day (YYYY-MM-DD). */
@@ -77,7 +79,7 @@ export interface ScoredDay {
 }
 
 /** Every logged day, oldest first, scored with its streak. */
-export function scoreHistory(entries: EntryMap): ScoredDay[] {
+export function scoreHistory(entries: EntryMap, rules: ScoringRules = DEFAULT_RULES): ScoredDay[] {
   const days = Object.keys(entries)
     .filter((day) => isLogged(entries[day]))
     .sort();
@@ -86,7 +88,7 @@ export function scoreHistory(entries: EntryMap): ScoredDay[] {
   return days.map((day) => {
     streak = previous !== null && diffDays(day, previous) === 1 ? streak + 1 : 1;
     previous = day;
-    return { day, entry: entries[day], score: scoreDay(entries[day], streak), streak };
+    return { day, entry: entries[day], score: scoreDay(entries[day], streak, rules), streak };
   });
 }
 

@@ -1,26 +1,28 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AccountTab } from "./AccountTab";
 import { AuthScreen } from "./AuthScreen";
 import { DailyLog } from "./DailyLog";
-import { LeaguesPanel } from "./LeaguesPanel";
-import { Leaderboard } from "./Leaderboard";
+import { LeaguesTab } from "./LeaguesTab";
 import { Personal } from "./Personal";
+import { ScoringEditor } from "./ScoringEditor";
 import { dayKey, periodLabel } from "@/lib/dates";
 import { currentStreak, streakAt } from "@/lib/history";
-import { EMPTY_DAY, scoreDay, type DayEntry } from "@/lib/scoring";
+import { EMPTY_DAY, isDefaultRules, scoreDay, type DayEntry } from "@/lib/scoring";
 import { supabase } from "@/lib/supabase";
 import { useEntries } from "@/lib/useEntries";
 import { useLeagues } from "@/lib/useLeagues";
+import { useScoringRules } from "@/lib/useScoringRules";
 import { useSession } from "@/lib/useSession";
 
-type Tab = "log" | "personal" | "board" | "leagues";
+type Tab = "log" | "personal" | "leagues" | "account";
 
 const TITLES: Record<Tab, string> = {
   log: "Daily log",
   personal: "Personal",
-  board: "Leaderboard",
   leagues: "Leagues",
+  account: "Account",
 };
 
 function Loading() {
@@ -33,13 +35,28 @@ function Loading() {
   );
 }
 
+const ICON = {
+  width: 24,
+  height: 24,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
 export function App() {
   const { session, ready } = useSession();
   const userId = session?.user.id;
   const { leagues, reload: reloadLeagues } = useLeagues(userId);
   const { entries, shared, loaded, status, error, save } = useEntries(userId);
+  const scoring = useScoringRules(userId);
+  const rules = scoring.rules;
 
   const [tab, setTab] = useState<Tab>("log");
+  const [scoringOpen, setScoringOpen] = useState(false);
   // Dates are filled in after the page loads so the server and browser agree.
   const [today, setToday] = useState("");
   const [day, setDay] = useState("");
@@ -62,31 +79,50 @@ export function App() {
     return chosen.filter((id) => leagues.some((l) => l.id === id));
   }, [entries, shared, day, defaultLeagueIds, leagues]);
 
-  const score = useMemo(() => scoreDay(entry, streakAt(entries, day)), [entry, entries, day]);
-
-  const todayTotal = useMemo(
-    () => scoreDay(entries[today] ?? EMPTY_DAY, streakAt(entries, today)).total,
-    [entries, today],
-  );
+  const score = useMemo(() => scoreDay(entry, streakAt(entries, day), rules), [entry, entries, day, rules]);
+  // Leagues always score with the standard rules, whatever the person customizes.
+  const standardTotal = useMemo(() => scoreDay(entry, streakAt(entries, day)).total, [entry, entries, day]);
   const streak = useMemo(() => (today ? currentStreak(entries, today) : 0), [entries, today]);
 
   if (!today) return <Loading />;
   if (supabase && !ready) return <Loading />;
   if (supabase && !session) return <AuthScreen />;
-  if (!loaded) return <Loading />;
+  if (!loaded || !scoring.loaded) return <Loading />;
+
+  const openScoring = () => {
+    setTab("log");
+    setScoringOpen(true);
+  };
+  const choose = (next: Tab) => {
+    setTab(next);
+    if (next !== "log") setScoringOpen(false);
+  };
+
+  const heading = tab === "log" && scoringOpen ? "My scoring" : TITLES[tab];
+  const kicker = tab === "log" && !scoringOpen ? periodLabel(day, "day") : "Wellness League";
 
   return (
     <div className="shell">
       <header className="head">
         <div>
-          <div className="kicker">{tab === "log" ? periodLabel(day, "day") : "Wellness League"}</div>
-          <h1 className="title">{TITLES[tab]}</h1>
+          <div className="kicker">{kicker}</div>
+          <h1 className="title">{heading}</h1>
         </div>
         <span className="streak">{streak}-day streak</span>
       </header>
 
       <main className="main">
-        {tab === "log" && (
+        {tab === "log" && scoringOpen && (
+          <ScoringEditor
+            rules={rules}
+            onChange={scoring.save}
+            onReset={scoring.reset}
+            onBack={() => setScoringOpen(false)}
+            status={scoring.status}
+            error={scoring.error}
+          />
+        )}
+        {tab === "log" && !scoringOpen && (
           <DailyLog
             day={day}
             today={today}
@@ -100,42 +136,56 @@ export function App() {
             onLeaguesChange={(ids) => save(day, entry, ids)}
             status={status}
             error={error}
+            rules={rules}
+            customized={!isDefaultRules(rules)}
+            standardTotal={standardTotal}
+            onOpenScoring={openScoring}
           />
         )}
-        {tab === "personal" && <Personal entries={entries} today={today} />}
-        {tab === "board" && <Leaderboard todayTotal={todayTotal} />}
-        {tab === "leagues" && <LeaguesPanel session={session} onLeaguesChanged={reloadLeagues} />}
+        {tab === "personal" && <Personal entries={entries} today={today} rules={rules} />}
+        {tab === "leagues" && (
+          <LeaguesTab
+            session={session}
+            leagues={leagues}
+            onLeaguesChanged={reloadLeagues}
+            entries={entries}
+            shared={shared}
+            today={today}
+          />
+        )}
+        {tab === "account" && (
+          <AccountTab session={session} rules={rules} onResetScoring={scoring.reset} onOpenScoring={openScoring} />
+        )}
       </main>
 
       <nav className="nav" aria-label="Main">
         <div className="nav-inner">
-          <button aria-current={tab === "log" ? "page" : undefined} onClick={() => setTab("log")}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <button aria-current={tab === "log" ? "page" : undefined} onClick={() => choose("log")}>
+            <svg {...ICON}>
               <rect x="5" y="4" width="14" height="17" rx="3" />
               <path d="M9 4.5h6M9 13l2.2 2.2L15.5 11" />
             </svg>
             Daily log
           </button>
-          <button aria-current={tab === "personal" ? "page" : undefined} onClick={() => setTab("personal")}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <button aria-current={tab === "personal" ? "page" : undefined} onClick={() => choose("personal")}>
+            <svg {...ICON}>
               <path d="M5 20V11M12 20V5M19 20v-7" />
             </svg>
             Personal
           </button>
-          <button aria-current={tab === "board" ? "page" : undefined} onClick={() => setTab("board")}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <button aria-current={tab === "leagues" ? "page" : undefined} onClick={() => choose("leagues")}>
+            <svg {...ICON}>
               <path d="M8 4h8v5a4 4 0 0 1-8 0z" />
               <path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7" />
             </svg>
-            Leaderboard
-          </button>
-          <button aria-current={tab === "leagues" ? "page" : undefined} onClick={() => setTab("leagues")}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="9" cy="8" r="3.2" />
-              <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
-              <path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M17.5 14a5.5 5.5 0 0 1 3 5" />
-            </svg>
             Leagues
+          </button>
+          <button aria-current={tab === "account" ? "page" : undefined} onClick={() => choose("account")}>
+            <svg {...ICON}>
+              <circle cx="12" cy="8" r="3.6" />
+              <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
+            </svg>
+            Account
           </button>
         </div>
       </nav>

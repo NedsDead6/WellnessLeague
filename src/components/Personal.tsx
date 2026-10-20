@@ -30,7 +30,7 @@ import {
   type Totals,
 } from "@/lib/history";
 import { BONUS_COLOR, CATEGORY_COLORS, GROUP_COLORS } from "@/lib/colors";
-import { CATEGORIES, type CategoryKey } from "@/lib/scoring";
+import { CATEGORIES, type CategoryKey, type ScoringRules } from "@/lib/scoring";
 import { fmt, fmtSigned } from "./DailyLog";
 
 const PERIODS: { id: Period; label: string; count: number; title: string }[] = [
@@ -42,8 +42,8 @@ const PERIODS: { id: Period; label: string; count: number; title: string }[] = [
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-export function Personal({ entries, today }: { entries: EntryMap; today: string }) {
-  const history = useMemo(() => scoreHistory(entries), [entries]);
+export function Personal({ entries, today, rules }: { entries: EntryMap; today: string; rules: ScoringRules }) {
+  const history = useMemo(() => scoreHistory(entries, rules), [entries, rules]);
   const [period, setPeriod] = useState<Period>("day");
   const [offset, setOffset] = useState(0);
 

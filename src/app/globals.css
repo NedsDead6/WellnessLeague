@@ -1225,3 +1225,75 @@ button:focus-visible {
   font-size: 13px;
   text-align: right;
 }
+
+/* Scoring settings, leagues and account */
+.scoring-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -4px 4px 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.back {
+  margin-bottom: 4px;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.rule-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.rule-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rule-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rule-field > span {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.num.fill {
+  width: 100%;
+  margin: 0;
+}
+
+.league-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.league-tabs button {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--card-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.league-tabs button[aria-pressed="true"] {
+  background: var(--deep);
+  border-color: var(--deep);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(47, 107, 255, 0.45);
+}

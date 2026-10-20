@@ -9,25 +9,30 @@ interface Props {
   decimals: boolean;
   unit: string;
   label: string;
+  /** Digits allowed after the decimal point (defaults to 2 when decimals are on). */
+  places?: number;
+  /** Values below this are not saved. */
+  min?: number;
+  className?: string;
   onCommit: (value: number) => void;
 }
 
 /** A number the person can type, shown with thousands separators when not being edited. */
-export function NumberField({ value, max, decimals, unit, label, onCommit }: Props) {
+export function NumberField({ value, max, decimals, unit, label, places = 2, min = 0, className = "", onCommit }: Props) {
   const [draft, setDraft] = useState<string | null>(null);
-  const shown = draft ?? value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const shown = draft ?? value.toLocaleString("en-US", { maximumFractionDigits: Math.max(2, places) });
 
   const change = (raw: string) => {
     const typed = raw.replace(/\s/g, "");
     const cleaned = typed.replace(/,/g, "");
-    if (!(decimals ? /^\d*\.?\d{0,2}$/ : /^\d*$/).test(cleaned)) return;
+    if (!(decimals ? new RegExp(`^\\d*\\.?\\d{0,${places}}$`) : /^\d*$/).test(cleaned)) return;
     setDraft(typed);
     const parsed = cleaned === "" || cleaned === "." ? 0 : Math.min(max, parseFloat(cleaned));
-    if (parsed !== value) onCommit(parsed);
+    if (parsed !== value && parsed >= min) onCommit(parsed);
   };
 
   return (
-    <label className="num">
+    <label className={`num ${className}`}>
       <input
         type="text"
         inputMode={decimals ? "decimal" : "numeric"}
