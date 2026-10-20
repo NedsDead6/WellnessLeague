@@ -1,10 +1,10 @@
 -- Milestone 3: personal tracking, and choosing which leagues count each day.
--- Run once in the Supabase dashboard: SQL Editor -> New query -> paste -> Run.
+-- Safe to run more than once. Run in the Supabase dashboard: SQL Editor -> New query -> paste -> Run.
 -- Run it AFTER schema.sql and 002_leagues_and_invites.sql.
 
 -- Every saved day always counts toward the person's own stats (daily_entries).
 -- This table records which leagues a given day ALSO counts toward.
-create table public.entry_leagues (
+create table if not exists public.entry_leagues (
   user_id uuid not null,
   day date not null,
   league_id uuid not null references public.leagues (id) on delete cascade,
@@ -14,11 +14,13 @@ create table public.entry_leagues (
 
 alter table public.entry_leagues enable row level security;
 
+drop policy if exists "manage your own shares, only for leagues you are in" on public.entry_leagues;
 create policy "manage your own shares, only for leagues you are in" on public.entry_leagues
   for all to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid() and public.is_league_member(league_id));
 
+drop policy if exists "league members see what was shared with the league" on public.entry_leagues;
 create policy "league members see what was shared with the league" on public.entry_leagues
   for select to authenticated
   using (public.is_league_member(league_id));
@@ -28,6 +30,7 @@ create policy "league members see what was shared with the league" on public.ent
 -- they are both in. Everything else stays personal.
 drop policy if exists "league mates see each other's entries" on public.daily_entries;
 
+drop policy if exists "entries shared with a common league" on public.daily_entries;
 create policy "entries shared with a common league" on public.daily_entries
   for select to authenticated
   using (
