@@ -6,22 +6,26 @@ describe("scoreDay", () => {
     expect(scoreDay(EMPTY_DAY, 0).total).toBe(0);
   });
 
-  it("gives +3 per 30 minutes of exercise, capped at 2 hours", () => {
-    expect(scoreDay({ ...EMPTY_DAY, exerciseMin: 29 }, 0).physical).toBe(0);
-    expect(scoreDay({ ...EMPTY_DAY, exerciseMin: 30 }, 0).physical).toBe(3);
+  it("gives +1 per 15 minutes of exercise, capped at 12", () => {
+    expect(scoreDay({ ...EMPTY_DAY, exerciseMin: 14 }, 0).physical).toBe(0);
+    expect(scoreDay({ ...EMPTY_DAY, exerciseMin: 15 }, 0).physical).toBe(1);
+    expect(scoreDay({ ...EMPTY_DAY, exerciseMin: 60 }, 0).physical).toBe(4);
     expect(scoreDay({ ...EMPTY_DAY, exerciseMin: 600 }, 0).physical).toBe(12);
   });
 
-  it("gives +1 per 1,000 steps", () => {
-    expect(scoreDay({ ...EMPTY_DAY, steps: 999 }, 0).physical).toBe(0);
-    expect(scoreDay({ ...EMPTY_DAY, steps: 10500 }, 0).physical).toBe(10);
+  it("gives 1/1000 of a point per step", () => {
+    expect(scoreDay({ ...EMPTY_DAY, steps: 1 }, 0).categories.steps).toBe(0.001);
+    expect(scoreDay({ ...EMPTY_DAY, steps: 16972 }, 0).categories.steps).toBe(16.972);
+    expect(scoreDay({ ...EMPTY_DAY, steps: 50000 }, 0).categories.steps).toBe(20);
   });
 
-  it("grades sleep", () => {
-    expect(sleepPoints(5.5)).toBe(0);
-    expect(sleepPoints(6)).toBe(1);
-    expect(sleepPoints(7)).toBe(2);
-    expect(sleepPoints(8)).toBe(3);
+  it("scores sleep 1 per hour, with +1 at 7 hours and +2 at 8", () => {
+    expect(sleepPoints(0)).toBe(0);
+    expect(sleepPoints(5.5)).toBe(5.5);
+    expect(sleepPoints(6)).toBe(6);
+    expect(sleepPoints(7)).toBe(8);
+    expect(sleepPoints(8)).toBe(10);
+    expect(sleepPoints(11)).toBe(10);
   });
 
   it("scores meals 0 to 2 each", () => {

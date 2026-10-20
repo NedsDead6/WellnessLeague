@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
+import { CATEGORY_COLORS, GROUP_COLORS, tint } from "@/lib/colors";
 import { addDays, dayOfMonth, dayShortWeekday, dayLong } from "@/lib/dates";
 import { isLogged, type EntryMap } from "@/lib/history";
-import { type CategoryKey, type DayEntry, type DayScore, type Group } from "@/lib/scoring";
+import { EMPTY_DAY, type CategoryKey, type DayEntry, type DayScore, type Group } from "@/lib/scoring";
 import type { League, SaveStatus } from "@/lib/types";
+import { NumberField } from "./NumberField";
 
 type NumericField = Exclude<keyof DayEntry, "meals" | "water">;
 
@@ -14,65 +17,63 @@ interface StepperRow {
   sub: string;
   step: number;
   max: number;
-  show: (n: number) => string;
+  unit: string;
+  decimals: boolean;
 }
-
-const minutes = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`);
-const hours = (h: number) => `${h} ${h === 1 ? "hr" : "hrs"}`;
-const plain = (n: number) => String(n);
 
 const GROUPS: { id: Group; title: string; color: string; fields: StepperRow[] }[] = [
   {
     id: "physical",
     title: "Physical",
-    color: "var(--physical)",
+    color: GROUP_COLORS.physical,
     fields: [
-      { field: "exerciseMin", category: "exercise", label: "Exercise", sub: "+3 per 30 min, max +12", step: 30, max: 240, show: minutes },
-      { field: "steps", category: "steps", label: "Steps", sub: "+1 per 1,000, max +20", step: 1000, max: 40000, show: (n) => n.toLocaleString("en-US") },
-      { field: "sleepHours", category: "sleep", label: "Sleep", sub: "+3 for 8+ hrs, +2 for 7+, +1 for 6+", step: 0.5, max: 12, show: hours },
+      { field: "exerciseMin", category: "exercise", label: "Exercise", sub: "+1 per 15 min, max +12", step: 15, max: 600, unit: "min", decimals: false },
+      { field: "steps", category: "steps", label: "Steps", sub: "1/1000 point per step, max +20", step: 1000, max: 100000, unit: "steps", decimals: false },
+      { field: "sleepHours", category: "sleep", label: "Sleep", sub: "+1 per hr, bonus +1 at 7 hrs, +2 at 8 hrs", step: 0.5, max: 24, unit: "hrs", decimals: true },
     ],
   },
   {
     id: "mental",
     title: "Mental",
-    color: "var(--mental)",
+    color: GROUP_COLORS.mental,
     fields: [
-      { field: "meditationMin", category: "meditation", label: "Meditation", sub: "+1 per 15 min, max +8", step: 15, max: 240, show: minutes },
-      { field: "workHours", category: "work", label: "Work", sub: "+1 per hour, max +14", step: 1, max: 16, show: hours },
-      { field: "socialHours", category: "social", label: "Social time", sub: "+1 per hour, max +6", step: 1, max: 12, show: hours },
-      { field: "readingMin", category: "reading", label: "Reading", sub: "+1 per 30 min, max +4", step: 30, max: 300, show: minutes },
-      { field: "journalEntries", category: "journal", label: "Journaling or gratitude", sub: "+1 per entry, max +3", step: 1, max: 6, show: plain },
+      { field: "meditationMin", category: "meditation", label: "Meditation", sub: "+1 per 15 min, max +8", step: 15, max: 600, unit: "min", decimals: false },
+      { field: "workHours", category: "work", label: "Work", sub: "+1 per hour, max +14", step: 1, max: 24, unit: "hrs", decimals: true },
+      { field: "socialHours", category: "social", label: "Social time", sub: "+1 per hour, max +6", step: 1, max: 24, unit: "hrs", decimals: true },
+      { field: "readingMin", category: "reading", label: "Reading", sub: "+1 per 30 min, max +4", step: 30, max: 1440, unit: "min", decimals: false },
+      { field: "journalEntries", category: "journal", label: "Journaling or gratitude", sub: "+1 per entry, max +3", step: 1, max: 20, unit: "", decimals: false },
     ],
   },
   {
     id: "spiritual",
     title: "Spiritual",
-    color: "var(--spiritual)",
+    color: GROUP_COLORS.spiritual,
     fields: [
-      { field: "worshipMin", category: "worship", label: "Worship and prayer", sub: "+1 per 15 min, max +8", step: 15, max: 240, show: minutes },
-      { field: "serviceHours", category: "service", label: "Service or volunteering", sub: "+1 per hour, max +4", step: 1, max: 12, show: hours },
+      { field: "worshipMin", category: "worship", label: "Worship and prayer", sub: "+1 per 15 min, max +8", step: 15, max: 600, unit: "min", decimals: false },
+      { field: "serviceHours", category: "service", label: "Service or volunteering", sub: "+1 per hour, max +4", step: 1, max: 24, unit: "hrs", decimals: true },
     ],
   },
   {
     id: "penalty",
     title: "Penalties",
-    color: "var(--penalty)",
+    color: GROUP_COLORS.penalty,
     fields: [
-      { field: "screenHours", category: "screen", label: "Screen time (non-work)", sub: "-1 per hour", step: 1, max: 16, show: hours },
-      { field: "drinks", category: "drinks", label: "Alcoholic drinks", sub: "-0.5 per drink", step: 1, max: 20, show: plain },
-      { field: "weed", category: "weed", label: "Weed", sub: "-5 each time", step: 1, max: 10, show: plain },
-      { field: "cigarettes", category: "cigarettes", label: "Cigarettes", sub: "-0.5 per cigarette", step: 1, max: 40, show: plain },
+      { field: "screenHours", category: "screen", label: "Screen time (non-work)", sub: "-1 per hour", step: 1, max: 24, unit: "hrs", decimals: true },
+      { field: "drinks", category: "drinks", label: "Alcoholic drinks", sub: "-0.5 per drink", step: 1, max: 50, unit: "", decimals: false },
+      { field: "weed", category: "weed", label: "Weed", sub: "-5 each time", step: 1, max: 20, unit: "", decimals: false },
+      { field: "cigarettes", category: "cigarettes", label: "Cigarettes", sub: "-0.5 per cigarette", step: 1, max: 100, unit: "", decimals: false },
     ],
   },
 ];
 
 const MEALS = ["Breakfast", "Lunch", "Dinner"];
 
-export const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+export const fmt = (n: number) => String(Number(n.toFixed(2)));
 export const fmtSigned = (n: number) => (n === 0 ? "0" : `${n > 0 ? "+" : "-"}${fmt(Math.abs(n))}`);
 
-function pillClass(group: Group, points: number) {
-  return points === 0 ? "pill" : `pill ${group}`;
+/** Pill colors: the category's own neon when it has points, otherwise quiet. */
+function pillStyle(color: string, points: number) {
+  return points === 0 ? undefined : { background: tint(color), color };
 }
 
 const STATUS_TEXT: Record<SaveStatus, string> = {
@@ -123,6 +124,8 @@ export function DailyLog({
     onChange({ ...entry, [row.field]: next });
   };
 
+  const set = (row: StepperRow, value: number) => onChange({ ...entry, [row.field]: value });
+
   const setMeal = (index: number, grade: number) => {
     const meals = [...entry.meals] as DayEntry["meals"];
     meals[index] = grade;
@@ -130,9 +133,9 @@ export function DailyLog({
   };
 
   const pillars: { name: string; pts: number; max: number; color: string }[] = [
-    { name: "Physical", pts: score.physical, max: 42, color: "#5ccfb5" },
-    { name: "Mental", pts: score.mental, max: 35, color: "#9aa5ff" },
-    { name: "Spiritual", pts: score.spiritual, max: 12, color: "#f2c063" },
+    { name: "Physical", pts: score.physical, max: 49, color: GROUP_COLORS.physical },
+    { name: "Mental", pts: score.mental, max: 35, color: GROUP_COLORS.mental },
+    { name: "Spiritual", pts: score.spiritual, max: 12, color: GROUP_COLORS.spiritual },
   ];
 
   const heading = day === today ? "Today's points" : `Points for ${dayLong(day)}`;
@@ -141,8 +144,11 @@ export function DailyLog({
     <>
       <DayPicker today={today} selected={day} entries={entries} onPick={onPickDay} />
 
-      <div className="save-line" aria-live="polite">
-        {error ? <span className="save-error">{error}</span> : STATUS_TEXT[status]}
+      <div className="save-row">
+        <div className="save-line" aria-live="polite">
+          {error ? <span className="save-error">{error}</span> : STATUS_TEXT[status]}
+        </div>
+        <ClearDay key={day} day={day} disabled={!isLogged(entry)} onClear={() => onChange(EMPTY_DAY)} />
       </div>
 
       <Destination leagues={leagues} selected={selectedLeagueIds} onChange={onLeaguesChange} />
@@ -179,7 +185,7 @@ export function DailyLog({
           {group.id === "physical" && (
             <>
               {GROUPS[0].fields.slice(0, 2).map((row) => (
-                <Stepper key={row.field} row={row} group={group.id} entry={entry} score={score} bump={bump} />
+                <Stepper key={row.field} row={row} group={group.id} entry={entry} score={score} bump={bump} set={set} />
               ))}
               {MEALS.map((name, index) => {
                 const points = entry.meals[index];
@@ -187,7 +193,7 @@ export function DailyLog({
                   <div className="row" key={name}>
                     <div className="row-top">
                       <span className="row-label">{name}</span>
-                      <span className={pillClass("physical", points)}>{fmtSigned(points)}</span>
+                      <span className="pill" style={pillStyle(CATEGORY_COLORS.meals, points)}>{fmtSigned(points)}</span>
                     </div>
                     <div className="row-bottom">
                       <span className="row-sub">0 junk, 1 mixed, 2 healthy</span>
@@ -208,11 +214,11 @@ export function DailyLog({
                   </div>
                 );
               })}
-              <Stepper row={GROUPS[0].fields[2]} group={group.id} entry={entry} score={score} bump={bump} />
+              <Stepper row={GROUPS[0].fields[2]} group={group.id} entry={entry} score={score} bump={bump} set={set} />
               <div className="row">
                 <div className="row-top">
                   <span className="row-label">Water</span>
-                  <span className={pillClass("physical", entry.water ? 1 : 0)}>{fmtSigned(entry.water ? 1 : 0)}</span>
+                  <span className="pill" style={pillStyle(CATEGORY_COLORS.water, entry.water ? 1 : 0)}>{fmtSigned(entry.water ? 1 : 0)}</span>
                 </div>
                 <div className="row-bottom">
                   <span className="row-sub">Daily glass target met</span>
@@ -234,7 +240,7 @@ export function DailyLog({
 
           {group.id !== "physical" &&
             group.fields.map((row) => (
-              <Stepper key={row.field} row={row} group={group.id} entry={entry} score={score} bump={bump} />
+              <Stepper key={row.field} row={row} group={group.id} entry={entry} score={score} bump={bump} set={set} />
             ))}
         </section>
       ))}
@@ -322,19 +328,21 @@ function Stepper({
   entry,
   score,
   bump,
+  set,
 }: {
   row: StepperRow;
   group: Group;
   entry: DayEntry;
   score: DayScore;
   bump: (row: StepperRow, direction: 1 | -1) => void;
+  set: (row: StepperRow, value: number) => void;
 }) {
   const points = score.categories[row.category];
   return (
     <div className="row">
       <div className="row-top">
         <span className="row-label">{row.label}</span>
-        <span className={pillClass(group, points)}>{fmtSigned(points)}</span>
+        <span className="pill" style={pillStyle(CATEGORY_COLORS[row.category], points)}>{fmtSigned(points)}</span>
       </div>
       <div className="row-bottom">
         <span className="row-sub">{row.sub}</span>
@@ -344,7 +352,14 @@ function Stepper({
               <path d="M5 12h14" />
             </svg>
           </button>
-          <span className="value">{row.show(entry[row.field])}</span>
+          <NumberField
+            value={entry[row.field]}
+            max={row.max}
+            decimals={row.decimals}
+            unit={row.unit}
+            label={row.label}
+            onCommit={(value) => set(row, value)}
+          />
           <button className="square" aria-label={`Increase ${row.label}`} onClick={() => bump(row, 1)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
               <path d="M5 12h14M12 5v14" />
@@ -352,6 +367,35 @@ function Stepper({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ClearDay({ day, disabled, onClear }: { day: string; disabled: boolean; onClear: () => void }) {
+  const [asking, setAsking] = useState(false);
+  if (!asking) {
+    return (
+      <button className="text-button" type="button" disabled={disabled} onClick={() => setAsking(true)}>
+        Clear all entries
+      </button>
+    );
+  }
+  return (
+    <div className="confirm" role="alertdialog" aria-label="Confirm clearing entries">
+      <span>Clear everything for {dayLong(day)}?</span>
+      <button
+        className="text-button danger"
+        type="button"
+        onClick={() => {
+          onClear();
+          setAsking(false);
+        }}
+      >
+        Yes, clear
+      </button>
+      <button className="text-button" type="button" onClick={() => setAsking(false)}>
+        Cancel
+      </button>
     </div>
   );
 }

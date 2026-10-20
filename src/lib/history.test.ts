@@ -16,7 +16,7 @@ import {
   currentStreak,
   isLogged,
   normalizeEntry,
-  periodSeries,
+  averageSeries,
   scoreHistory,
   streakAt,
   totalsBetween,
@@ -131,21 +131,29 @@ describe("history", () => {
     const week = totalsBetween(history, "2026-10-19", "2026-10-25");
     expect(week.loggedDays).toBe(2);
     expect(week.categories.steps).toBe(7);
-    expect(week.categories.exercise).toBe(3);
+    expect(week.categories.exercise).toBe(2);
     expect(week.categories.drinks).toBe(-1);
-    expect(week.total).toBe(7 + 3 - 1);
+    expect(week.total).toBe(7 + 2 - 1);
     expect(week.total).toBe(week.physical + week.mental + week.spiritual + week.penalties + week.bonuses);
   });
 
-  it("builds a series of periods ending at the anchor", () => {
+  it("builds a series of per-logged-day averages ending at the anchor", () => {
     const entries: EntryMap = {
       "2026-10-12": walked(4000),
       "2026-10-20": walked(6000),
+      "2026-10-21": walked(2000),
     };
-    const series = periodSeries(scoreHistory(entries), "week", "2026-10-19", 3);
+    const series = averageSeries(scoreHistory(entries), "week", "2026-10-19", 3);
     expect(series.map((p) => p.start)).toEqual(["2026-10-05", "2026-10-12", "2026-10-19"]);
-    expect(series.map((p) => p.total)).toEqual([0, 4, 6]);
-    expect(series.map((p) => p.loggedDays)).toEqual([0, 1, 1]);
+    expect(series.map((p) => p.average.total)).toEqual([0, 4, 4]);
+    expect(series.map((p) => p.loggedDays)).toEqual([0, 1, 2]);
+    expect(series[2].average.categories.steps).toBe(4);
+  });
+
+  it("uses each day's own points for a daily series", () => {
+    const entries: EntryMap = { "2026-10-19": walked(3000), "2026-10-20": walked(5000) };
+    const series = averageSeries(scoreHistory(entries), "day", "2026-10-20", 3);
+    expect(series.map((p) => p.average.total)).toEqual([0, 3, 5]);
   });
 
   it("keeps category points consistent with the day score", () => {

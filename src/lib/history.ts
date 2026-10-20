@@ -9,6 +9,7 @@ import {
   EMPTY_DAY,
   emptyCategoryPoints,
   scoreDay,
+  type CategoryKey,
   type CategoryPoints,
   type DayEntry,
   type DayScore,
@@ -131,19 +132,41 @@ export function totalsBetween(history: ScoredDay[], start: string, end: string):
   return sumDays(history.filter((d) => d.day >= start && d.day <= end));
 }
 
-export interface SeriesPoint {
-  start: string;
-  total: number;
-  loggedDays: number;
+/** The same totals, scaled to an average per logged day. */
+export function averageOf(t: Totals): Totals {
+  const n = t.loggedDays;
+  if (n === 0) return t;
+  const categories = emptyCategoryPoints();
+  for (const key of Object.keys(t.categories) as CategoryKey[]) categories[key] = t.categories[key] / n;
+  return {
+    total: t.total / n,
+    physical: t.physical / n,
+    mental: t.mental / n,
+    spiritual: t.spiritual / n,
+    penalties: t.penalties / n,
+    bonuses: t.bonuses / n,
+    loggedDays: n,
+    categories,
+  };
 }
 
-/** Totals for `count` periods in a row, ending with the period that starts at `anchor`. */
-export function periodSeries(history: ScoredDay[], period: Period, anchor: string, count: number): SeriesPoint[] {
+export interface SeriesPoint {
+  start: string;
+  loggedDays: number;
+  /** Average points per logged day in this period, split by category. */
+  average: Totals;
+}
+
+/**
+ * Average points per logged day for `count` periods in a row, ending with the
+ * period that starts at `anchor`. For a "day" period that is just that day.
+ */
+export function averageSeries(history: ScoredDay[], period: Period, anchor: string, count: number): SeriesPoint[] {
   const points: SeriesPoint[] = [];
   for (let i = count - 1; i >= 0; i -= 1) {
     const start = shiftPeriod(anchor, period, -i);
     const totals = totalsBetween(history, start, periodEnd(start, period));
-    points.push({ start, total: totals.total, loggedDays: totals.loggedDays });
+    points.push({ start, loggedDays: totals.loggedDays, average: averageOf(totals) });
   }
   return points;
 }

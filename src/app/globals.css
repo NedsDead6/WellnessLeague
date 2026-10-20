@@ -1,19 +1,24 @@
 :root {
-  --bg: #f4f7f5;
-  --card: #ffffff;
-  --line: #dce5e1;
-  --ink: #10302b;
-  --muted: #51635e;
-  --deep: #0f3d35;
-  --physical: #0b6657;
-  --physical-tint: #e3f3ef;
-  --mental: #3944b8;
-  --mental-tint: #e8eafb;
-  --spiritual: #7a4e08;
-  --spiritual-tint: #fbf0dc;
-  --penalty: #a12218;
-  --penalty-tint: #fce8e6;
-  --quiet-tint: #eef2f0;
+  color-scheme: dark;
+  --bg: #0a1226;
+  --card: #121c38;
+  --card-2: #1a2750;
+  --well: #0d1630;
+  --line: #243358;
+  --line-strong: #34477c;
+  --ink: #eaf0ff;
+  --muted: #8fa1c9;
+  --deep: #2f6bff;
+  --on-neon: #06102a;
+  --physical: #2bff88;
+  --physical-tint: rgba(43, 255, 136, 0.14);
+  --mental: #b58cff;
+  --mental-tint: rgba(181, 140, 255, 0.16);
+  --spiritual: #ffd23d;
+  --spiritual-tint: rgba(255, 210, 61, 0.15);
+  --penalty: #ff4d6d;
+  --penalty-tint: rgba(255, 77, 109, 0.16);
+  --quiet-tint: #1a2750;
 }
 
 * {
@@ -23,7 +28,8 @@
 html,
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--bg) radial-gradient(900px 420px at 50% -120px, #1b2f78 0%, rgba(10, 18, 38, 0) 70%) no-repeat;
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-body), system-ui, sans-serif;
   -webkit-text-size-adjust: 100%;
@@ -39,7 +45,7 @@ button {
 }
 
 button:focus-visible {
-  outline: 2px solid var(--mental);
+  outline: 2px solid var(--deep);
   outline-offset: 2px;
 }
 
@@ -92,7 +98,9 @@ button:focus-visible {
 }
 
 .hero {
-  background: var(--deep);
+  background: linear-gradient(145deg, #2342a8 0%, #162a6e 55%, #101d4e 100%);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 10px 30px rgba(20, 60, 200, 0.25);
   color: #fff;
   border-radius: 20px;
   padding: 20px;
@@ -108,6 +116,7 @@ button:focus-visible {
 }
 
 .hero-total {
+  text-shadow: 0 0 24px rgba(120, 170, 255, 0.55);
   font-family: var(--font-display), system-ui, sans-serif;
   font-size: 64px;
   line-height: 1;
@@ -163,15 +172,15 @@ button:focus-visible {
 }
 
 .chip.on {
-  background: #e6f4ef;
-  border-color: #e6f4ef;
-  color: var(--deep);
+  background: var(--physical);
+  border-color: var(--physical);
+  color: var(--on-neon);
 }
 
 .chip.neg {
-  background: var(--penalty-tint);
-  border-color: var(--penalty-tint);
-  color: var(--penalty);
+  background: var(--penalty);
+  border-color: var(--penalty);
+  color: var(--on-neon);
 }
 
 .group-head {
@@ -282,8 +291,8 @@ button:focus-visible {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  border: 1px solid #c3d1cb;
-  background: #fff;
+  border: 1px solid var(--line-strong);
+  background: var(--card-2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -291,14 +300,14 @@ button:focus-visible {
   font-weight: 600;
 }
 
-.square:hover {
-  background: #e6eeea;
+.square:hover:not(:disabled) {
+  background: #25356d;
 }
 
 .square[aria-pressed="true"] {
   background: var(--physical);
   border-color: var(--physical);
-  color: #fff;
+  color: var(--on-neon);
 }
 
 .grades {
@@ -320,11 +329,12 @@ button:focus-visible {
   width: 52px;
   height: 30px;
   border-radius: 15px;
-  background: #7c9a91;
+  background: #34477c;
 }
 
 .switch[aria-checked="true"] .rail {
   background: var(--physical);
+  box-shadow: 0 0 12px rgba(43, 255, 136, 0.5);
 }
 
 .switch .knob {
@@ -347,7 +357,8 @@ button:focus-visible {
   gap: 4px;
   padding: 4px;
   border-radius: 14px;
-  background: #e4eae7;
+  background: var(--well);
+  border: 1px solid var(--line);
   margin-bottom: 12px;
 }
 
@@ -359,9 +370,14 @@ button:focus-visible {
   font-weight: 600;
 }
 
+.seg button {
+  color: var(--muted);
+}
+
 .seg button[aria-pressed="true"] {
   background: var(--deep);
   color: #fff;
+  box-shadow: 0 4px 14px rgba(47, 107, 255, 0.45);
 }
 
 .callout {
@@ -409,13 +425,13 @@ button:focus-visible {
   justify-content: center;
   font-size: 15px;
   font-weight: 600;
-  background: #e4eae7;
-  color: #2b4640;
+  background: var(--card-2);
+  color: var(--ink);
 }
 
 .player.you .avatar {
-  background: var(--deep);
-  color: #fff;
+  background: var(--physical);
+  color: var(--on-neon);
 }
 
 .player-body {
@@ -437,25 +453,25 @@ button:focus-visible {
   font-weight: 600;
   border-radius: 999px;
   padding: 2px 8px;
-  background: var(--deep);
-  color: #fff;
+  background: var(--physical);
+  color: var(--on-neon);
 }
 
 .bar {
   height: 6px;
   border-radius: 3px;
-  background: #e4eae7;
+  background: var(--well);
   overflow: hidden;
 }
 
 .bar > div {
   height: 6px;
   border-radius: 3px;
-  background: #7c9a91;
+  background: #5c74b3;
 }
 
 .player.you .bar > div {
-  background: var(--deep);
+  background: var(--physical);
 }
 
 .player-pts {
@@ -479,7 +495,9 @@ button:focus-visible {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--card);
+  background: rgba(13, 22, 48, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -507,6 +525,10 @@ button:focus-visible {
   color: var(--physical);
 }
 
+.nav button[aria-current="page"] svg {
+  filter: drop-shadow(0 0 6px rgba(43, 255, 136, 0.7));
+}
+
 /* Forms and buttons (accounts and leagues) */
 .form {
   display: flex;
@@ -528,8 +550,8 @@ button:focus-visible {
   min-height: 48px;
   padding: 0 14px;
   border-radius: 12px;
-  border: 1px solid #c3d1cb;
-  background: #fff;
+  border: 1px solid var(--line-strong);
+  background: var(--well);
   color: var(--ink);
   font: inherit;
   font-size: 16px;
@@ -538,7 +560,7 @@ button:focus-visible {
 
 .field input:focus-visible,
 .link-box:focus-visible {
-  outline: 2px solid var(--mental);
+  outline: 2px solid var(--deep);
   outline-offset: 2px;
 }
 
@@ -563,6 +585,7 @@ button:focus-visible {
 .primary {
   background: var(--deep);
   color: #fff;
+  box-shadow: 0 6px 18px rgba(47, 107, 255, 0.4);
 }
 
 .primary:disabled {
@@ -571,8 +594,9 @@ button:focus-visible {
 }
 
 .secondary {
-  background: #fff;
-  border: 1px solid #c3d1cb;
+  background: var(--card-2);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
 }
 
 .link-button {
@@ -632,6 +656,7 @@ button:focus-visible {
   background: var(--deep);
   border-color: var(--deep);
   color: #fff;
+  box-shadow: 0 4px 14px rgba(47, 107, 255, 0.45);
 }
 
 .day-chip[aria-pressed="true"] .dow {
@@ -639,7 +664,7 @@ button:focus-visible {
 }
 
 .day-chip[aria-pressed="true"] .mark.on {
-  background: #5ccfb5;
+  background: var(--physical);
 }
 
 .save-line {
@@ -686,7 +711,7 @@ button:focus-visible {
 }
 
 .dest summary:focus-visible {
-  outline: 2px solid var(--mental);
+  outline: 2px solid var(--deep);
   outline-offset: 2px;
   border-radius: 14px;
 }
@@ -810,6 +835,10 @@ button:focus-visible {
   color: var(--penalty);
 }
 
+.chart-wrap {
+  position: relative;
+}
+
 .chart {
   display: block;
   width: 100%;
@@ -820,28 +849,29 @@ button:focus-visible {
 }
 
 .chart-axis {
-  stroke: #c3d1cb;
+  stroke: var(--line-strong);
   stroke-width: 1;
 }
 
-.chart-bar {
-  fill: #7c9a91;
+.chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
 }
 
-.chart-bar.selected {
-  fill: var(--deep);
+.chart-tick {
+  font-size: 10px;
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
-.chart-bar.negative {
-  fill: #d98a82;
-}
-
-.chart-bar.negative.selected {
-  fill: var(--penalty);
+.chart-seg {
+  stroke: var(--card);
+  stroke-width: 1;
 }
 
 .chart-empty {
-  fill: #c3d1cb;
+  fill: var(--line-strong);
 }
 
 .chart-label {
@@ -854,10 +884,103 @@ button:focus-visible {
   font-weight: 600;
 }
 
-.chart-value {
-  font-size: 12px;
+.chart-mark {
+  fill: var(--deep);
+}
+
+.chart-hit {
+  fill: transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+.chart-hit:hover,
+.chart-hit:focus-visible {
+  fill: rgba(255, 255, 255, 0.06);
+}
+
+.chart-tip {
+  position: absolute;
+  top: 10px;
+  transform: translateX(-50%);
+  z-index: 2;
+  min-width: 200px;
+  max-width: 260px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #0d1630;
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  font-size: 12.5px;
+  pointer-events: none;
+}
+
+.tip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
   font-weight: 600;
-  fill: var(--ink);
+}
+
+.tip-head strong {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tip-sub,
+.tip-empty {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.tip-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.tip-row i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.tip-row span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tip-row b {
+  font-variant-numeric: tabular-nums;
+}
+
+.legend {
+  list-style: none;
+  margin: 10px 2px 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
 }
 
 .data-table summary {
@@ -913,7 +1036,7 @@ button:focus-visible {
   display: block;
   height: 8px;
   border-radius: 4px;
-  background: #e4eae7;
+  background: var(--well);
   overflow: hidden;
 }
 
@@ -924,21 +1047,6 @@ button:focus-visible {
   background: var(--deep);
 }
 
-.bd-fill.physical {
-  background: var(--physical);
-}
-.bd-fill.mental {
-  background: var(--mental);
-}
-.bd-fill.spiritual {
-  background: #b9770e;
-}
-.bd-fill.penalty {
-  background: var(--penalty);
-}
-.bd-fill.bonus {
-  background: var(--deep);
-}
 
 .bd-value {
   text-align: right;
@@ -989,24 +1097,26 @@ button:focus-visible {
 
 .cal-cell.l0 {
   background: var(--spiritual-tint);
-  border-color: #e6cf9f;
+  border-color: rgba(255, 210, 61, 0.35);
 }
 .cal-cell.l1 {
-  background: #e1f1ed;
-  border-color: #e1f1ed;
+  background: rgba(43, 255, 136, 0.18);
+  border-color: rgba(43, 255, 136, 0.18);
 }
 .cal-cell.l2 {
-  background: #b6dfd3;
-  border-color: #b6dfd3;
+  background: rgba(43, 255, 136, 0.38);
+  border-color: rgba(43, 255, 136, 0.38);
 }
 .cal-cell.l3 {
-  background: #7cc6b3;
-  border-color: #7cc6b3;
+  background: rgba(43, 255, 136, 0.62);
+  border-color: rgba(43, 255, 136, 0.62);
+  color: var(--on-neon);
 }
 .cal-cell.l4 {
   background: var(--physical);
   border-color: var(--physical);
-  color: #fff;
+  color: var(--on-neon);
+  box-shadow: 0 0 12px rgba(43, 255, 136, 0.45);
 }
 
 .cal-cell.future {
@@ -1029,4 +1139,89 @@ button:focus-visible {
   min-height: 20px;
   padding: 0;
   display: inline-block;
+}
+
+/* Typed number entry and clearing a day */
+.num {
+  display: flex;
+  align-items: center;
+  width: 126px;
+  height: 44px;
+  margin: 0 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--well);
+}
+
+.num:focus-within {
+  border-color: var(--deep);
+  box-shadow: 0 0 0 2px rgba(47, 107, 255, 0.4);
+}
+
+.num input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.num input:focus {
+  outline: none;
+}
+
+.num .unit {
+  padding: 0 10px 0 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.save-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 4px 8px;
+}
+
+.save-row .save-line {
+  margin: 0;
+}
+
+.text-button {
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.text-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+  text-decoration: none;
+}
+
+.text-button.danger {
+  color: var(--penalty);
+}
+
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px 12px;
+  font-size: 13px;
+  text-align: right;
 }

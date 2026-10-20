@@ -91,18 +91,23 @@ export const emptyCategoryPoints = (): CategoryPoints =>
 const capped = (value: number, perUnit: number, pointsPerUnit: number, maxPoints: number) =>
   Math.min(maxPoints, Math.floor(Math.max(0, value) / perUnit) * pointsPerUnit);
 
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/**
+ * 1 point per hour slept, up to 8 hours, plus a bonus for a full night:
+ * +1 at 7 hours (8 points total) and +2 at 8 hours or more (10 points).
+ */
 export function sleepPoints(hours: number): number {
-  if (hours >= 8) return 3;
-  if (hours >= 7) return 2;
-  if (hours >= 6) return 1;
-  return 0;
+  const h = Math.max(0, hours);
+  const bonus = h >= 8 ? 2 : h >= 7 ? 1 : 0;
+  return round3(Math.min(h, 8) + bonus);
 }
 
 /** Points each category earned (or lost) for one day, before any bonuses. */
 export function categoryPoints(e: DayEntry): CategoryPoints {
   return {
-    exercise: capped(e.exerciseMin, 30, 3, 12), // +3 per 30 min, max 2 hours
-    steps: capped(e.steps, 1000, 1, 20), // +1 per 1,000 steps
+    exercise: capped(e.exerciseMin, 15, 1, 12), // +1 per 15 min, max 12 (3 hours)
+    steps: Math.min(20, round3(Math.max(0, e.steps) / 1000)), // 1/1000 of a point per step, max 20
     meals: e.meals.reduce((sum, grade) => sum + Math.min(2, Math.max(0, grade)), 0),
     sleep: sleepPoints(e.sleepHours),
     water: e.water ? 1 : 0,
@@ -140,14 +145,14 @@ export function scoreDay(e: DayEntry, streakDays: number): DayScore {
   const sumOf = (group: Group) =>
     CATEGORIES.filter((c) => c.group === group).reduce((sum, c) => sum + categories[c.key], 0);
 
-  const physical = sumOf("physical");
-  const mental = sumOf("mental");
-  const spiritual = sumOf("spiritual");
-  const penalties = sumOf("penalty");
+  const physical = round3(sumOf("physical"));
+  const mental = round3(sumOf("mental"));
+  const spiritual = round3(sumOf("spiritual"));
+  const penalties = round3(sumOf("penalty"));
 
   const balanceBonus = physical > 0 && mental > 0 && spiritual > 0 ? 2 : 0;
   const streakBonus = streakDays > 0 && streakDays % 7 === 0 ? 2 : 0;
-  const total = physical + mental + spiritual + penalties + balanceBonus + streakBonus;
+  const total = round3(physical + mental + spiritual + penalties + balanceBonus + streakBonus);
 
   return { physical, mental, spiritual, penalties, balanceBonus, streakBonus, total, categories };
 }
