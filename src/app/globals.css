@@ -585,3 +585,448 @@ button:focus-visible {
   line-height: 1.4;
   color: var(--penalty);
 }
+
+/* Daily log: day picker, save line, destination */
+.day-picker {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.day-chip {
+  min-height: 64px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.day-chip .dow {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.day-chip strong {
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-chip .mark {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.day-chip .mark.on {
+  background: var(--physical);
+}
+
+.day-chip[aria-pressed="true"] {
+  background: var(--deep);
+  border-color: var(--deep);
+  color: #fff;
+}
+
+.day-chip[aria-pressed="true"] .dow {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.day-chip[aria-pressed="true"] .mark.on {
+  background: #5ccfb5;
+}
+
+.save-line {
+  min-height: 20px;
+  margin: 0 4px 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.save-error {
+  color: var(--penalty);
+  font-weight: 600;
+}
+
+.dest {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  margin-bottom: 12px;
+}
+
+.dest summary {
+  min-height: 52px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.dest summary::-webkit-details-marker {
+  display: none;
+}
+
+.dest summary::after {
+  content: "\25BE";
+  color: var(--muted);
+}
+
+.dest[open] summary::after {
+  content: "\25B4";
+}
+
+.dest summary:focus-visible {
+  outline: 2px solid var(--mental);
+  outline-offset: 2px;
+  border-radius: 14px;
+}
+
+.dest-label {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dest-value {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dest-panel {
+  padding: 0 14px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 15px;
+}
+
+.check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--physical);
+}
+
+.dest-note {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.square:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Personal tab */
+.period-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.period-label {
+  flex: 1;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.period-now {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--physical);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stat {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 10px;
+}
+
+.stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+.stat-value {
+  margin: 6px 0 4px;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 24px;
+  line-height: 1.1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-delta {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+.stat-delta.up {
+  color: var(--physical);
+}
+
+.stat-delta.down {
+  color: var(--penalty);
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.chart-axis {
+  stroke: #c3d1cb;
+  stroke-width: 1;
+}
+
+.chart-bar {
+  fill: #7c9a91;
+}
+
+.chart-bar.selected {
+  fill: var(--deep);
+}
+
+.chart-bar.negative {
+  fill: #d98a82;
+}
+
+.chart-bar.negative.selected {
+  fill: var(--penalty);
+}
+
+.chart-empty {
+  fill: #c3d1cb;
+}
+
+.chart-label {
+  font-size: 10.5px;
+  fill: var(--muted);
+}
+
+.chart-label.selected {
+  fill: var(--ink);
+  font-weight: 600;
+}
+
+.chart-value {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+
+.data-table summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.data-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 8px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  font-weight: 400;
+}
+
+.data-table thead th {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.breakdown {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+
+.bd-row {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.bd-row.small {
+  font-size: 13.5px;
+}
+
+.bd-track {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: #e4eae7;
+  overflow: hidden;
+}
+
+.bd-fill {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--deep);
+}
+
+.bd-fill.physical {
+  background: var(--physical);
+}
+.bd-fill.mental {
+  background: var(--mental);
+}
+.bd-fill.spiritual {
+  background: #b9770e;
+}
+.bd-fill.penalty {
+  background: var(--penalty);
+}
+.bd-fill.bonus {
+  background: var(--deep);
+}
+
+.bd-value {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.bd-divider {
+  border-top: 1px solid var(--line);
+  margin: 12px 0 8px;
+}
+
+.cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.cal-dow {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.cal-cell {
+  min-height: 52px;
+  padding: 4px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--ink);
+}
+
+.cal-cell .n {
+  font-size: 12px;
+}
+
+.cal-cell .p {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-cell.l0 {
+  background: var(--spiritual-tint);
+  border-color: #e6cf9f;
+}
+.cal-cell.l1 {
+  background: #e1f1ed;
+  border-color: #e1f1ed;
+}
+.cal-cell.l2 {
+  background: #b6dfd3;
+  border-color: #b6dfd3;
+}
+.cal-cell.l3 {
+  background: #7cc6b3;
+  border-color: #7cc6b3;
+}
+.cal-cell.l4 {
+  background: var(--physical);
+  border-color: var(--physical);
+  color: #fff;
+}
+
+.cal-cell.future {
+  opacity: 0.45;
+}
+
+.cal-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cal-legend .cal-cell {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  display: inline-block;
+}

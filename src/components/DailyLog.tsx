@@ -1,12 +1,15 @@
 "use client";
 
-import { EMPTY_DAY, scoreDay, type DayEntry, type DayScore, type Pillar } from "@/lib/scoring";
+import { addDays, dayOfMonth, dayShortWeekday, dayLong } from "@/lib/dates";
+import { isLogged, type EntryMap } from "@/lib/history";
+import { type CategoryKey, type DayEntry, type DayScore, type Group } from "@/lib/scoring";
+import type { League, SaveStatus } from "@/lib/types";
 
 type NumericField = Exclude<keyof DayEntry, "meals" | "water">;
-type Group = Pillar | "penalty";
 
 interface StepperRow {
   field: NumericField;
+  category: CategoryKey;
   label: string;
   sub: string;
   step: number;
@@ -24,9 +27,9 @@ const GROUPS: { id: Group; title: string; color: string; fields: StepperRow[] }[
     title: "Physical",
     color: "var(--physical)",
     fields: [
-      { field: "exerciseMin", label: "Exercise", sub: "+3 per 30 min, max +12", step: 30, max: 240, show: minutes },
-      { field: "steps", label: "Steps", sub: "+1 per 1,000, max +20", step: 1000, max: 40000, show: (n) => n.toLocaleString("en-US") },
-      { field: "sleepHours", label: "Sleep", sub: "+3 for 8+ hrs, +2 for 7+, +1 for 6+", step: 0.5, max: 12, show: hours },
+      { field: "exerciseMin", category: "exercise", label: "Exercise", sub: "+3 per 30 min, max +12", step: 30, max: 240, show: minutes },
+      { field: "steps", category: "steps", label: "Steps", sub: "+1 per 1,000, max +20", step: 1000, max: 40000, show: (n) => n.toLocaleString("en-US") },
+      { field: "sleepHours", category: "sleep", label: "Sleep", sub: "+3 for 8+ hrs, +2 for 7+, +1 for 6+", step: 0.5, max: 12, show: hours },
     ],
   },
   {
@@ -34,11 +37,11 @@ const GROUPS: { id: Group; title: string; color: string; fields: StepperRow[] }[
     title: "Mental",
     color: "var(--mental)",
     fields: [
-      { field: "meditationMin", label: "Meditation", sub: "+1 per 15 min, max +8", step: 15, max: 240, show: minutes },
-      { field: "workHours", label: "Work", sub: "+1 per hour, max +14", step: 1, max: 16, show: hours },
-      { field: "socialHours", label: "Social time", sub: "+1 per hour, max +6", step: 1, max: 12, show: hours },
-      { field: "readingMin", label: "Reading", sub: "+1 per 30 min, max +4", step: 30, max: 300, show: minutes },
-      { field: "journalEntries", label: "Journaling or gratitude", sub: "+1 per entry, max +3", step: 1, max: 6, show: plain },
+      { field: "meditationMin", category: "meditation", label: "Meditation", sub: "+1 per 15 min, max +8", step: 15, max: 240, show: minutes },
+      { field: "workHours", category: "work", label: "Work", sub: "+1 per hour, max +14", step: 1, max: 16, show: hours },
+      { field: "socialHours", category: "social", label: "Social time", sub: "+1 per hour, max +6", step: 1, max: 12, show: hours },
+      { field: "readingMin", category: "reading", label: "Reading", sub: "+1 per 30 min, max +4", step: 30, max: 300, show: minutes },
+      { field: "journalEntries", category: "journal", label: "Journaling or gratitude", sub: "+1 per entry, max +3", step: 1, max: 6, show: plain },
     ],
   },
   {
@@ -46,8 +49,8 @@ const GROUPS: { id: Group; title: string; color: string; fields: StepperRow[] }[
     title: "Spiritual",
     color: "var(--spiritual)",
     fields: [
-      { field: "worshipMin", label: "Worship and prayer", sub: "+1 per 15 min, max +8", step: 15, max: 240, show: minutes },
-      { field: "serviceHours", label: "Service or volunteering", sub: "+1 per hour, max +4", step: 1, max: 12, show: hours },
+      { field: "worshipMin", category: "worship", label: "Worship and prayer", sub: "+1 per 15 min, max +8", step: 15, max: 240, show: minutes },
+      { field: "serviceHours", category: "service", label: "Service or volunteering", sub: "+1 per hour, max +4", step: 1, max: 12, show: hours },
     ],
   },
   {
@@ -55,10 +58,10 @@ const GROUPS: { id: Group; title: string; color: string; fields: StepperRow[] }[
     title: "Penalties",
     color: "var(--penalty)",
     fields: [
-      { field: "screenHours", label: "Screen time (non-work)", sub: "-1 per hour", step: 1, max: 16, show: hours },
-      { field: "drinks", label: "Alcoholic drinks", sub: "-0.5 per drink", step: 1, max: 20, show: plain },
-      { field: "weed", label: "Weed", sub: "-5 each time", step: 1, max: 10, show: plain },
-      { field: "cigarettes", label: "Cigarettes", sub: "-0.5 per cigarette", step: 1, max: 40, show: plain },
+      { field: "screenHours", category: "screen", label: "Screen time (non-work)", sub: "-1 per hour", step: 1, max: 16, show: hours },
+      { field: "drinks", category: "drinks", label: "Alcoholic drinks", sub: "-0.5 per drink", step: 1, max: 20, show: plain },
+      { field: "weed", category: "weed", label: "Weed", sub: "-5 each time", step: 1, max: 10, show: plain },
+      { field: "cigarettes", category: "cigarettes", label: "Cigarettes", sub: "-0.5 per cigarette", step: 1, max: 40, show: plain },
     ],
   },
 ];
@@ -72,18 +75,42 @@ function pillClass(group: Group, points: number) {
   return points === 0 ? "pill" : `pill ${group}`;
 }
 
-/** Points one row contributes, found by scoring an otherwise empty day. */
-function rowPoints(partial: Partial<DayEntry>) {
-  return scoreDay({ ...EMPTY_DAY, ...partial }, 0).total;
-}
+const STATUS_TEXT: Record<SaveStatus, string> = {
+  idle: "",
+  saving: "Saving...",
+  saved: "Saved",
+  error: "Couldn't save",
+};
 
 interface Props {
+  day: string;
+  today: string;
+  entries: EntryMap;
   entry: DayEntry;
   score: DayScore;
   onChange: (next: DayEntry) => void;
+  onPickDay: (day: string) => void;
+  leagues: League[];
+  selectedLeagueIds: string[];
+  onLeaguesChange: (ids: string[]) => void;
+  status: SaveStatus;
+  error: string | null;
 }
 
-export function DailyLog({ entry, score, onChange }: Props) {
+export function DailyLog({
+  day,
+  today,
+  entries,
+  entry,
+  score,
+  onChange,
+  onPickDay,
+  leagues,
+  selectedLeagueIds,
+  onLeaguesChange,
+  status,
+  error,
+}: Props) {
   const groupTotal: Record<Group, number> = {
     physical: score.physical,
     mental: score.mental,
@@ -108,10 +135,20 @@ export function DailyLog({ entry, score, onChange }: Props) {
     { name: "Spiritual", pts: score.spiritual, max: 12, color: "#f2c063" },
   ];
 
+  const heading = day === today ? "Today's points" : `Points for ${dayLong(day)}`;
+
   return (
     <>
-      <section className="hero" aria-label="Today's points">
-        <div className="hero-label">Today&apos;s points</div>
+      <DayPicker today={today} selected={day} entries={entries} onPick={onPickDay} />
+
+      <div className="save-line" aria-live="polite">
+        {error ? <span className="save-error">{error}</span> : STATUS_TEXT[status]}
+      </div>
+
+      <Destination leagues={leagues} selected={selectedLeagueIds} onChange={onLeaguesChange} />
+
+      <section className="hero" aria-label={heading}>
+        <div className="hero-label">{heading}</div>
         <div className="hero-total">{fmt(score.total)}</div>
         {pillars.map((p) => (
           <div className="pillar-row" key={p.name}>
@@ -142,7 +179,7 @@ export function DailyLog({ entry, score, onChange }: Props) {
           {group.id === "physical" && (
             <>
               {GROUPS[0].fields.slice(0, 2).map((row) => (
-                <Stepper key={row.field} row={row} group={group.id} entry={entry} bump={bump} />
+                <Stepper key={row.field} row={row} group={group.id} entry={entry} score={score} bump={bump} />
               ))}
               {MEALS.map((name, index) => {
                 const points = entry.meals[index];
@@ -171,7 +208,7 @@ export function DailyLog({ entry, score, onChange }: Props) {
                   </div>
                 );
               })}
-              <Stepper row={GROUPS[0].fields[2]} group={group.id} entry={entry} bump={bump} />
+              <Stepper row={GROUPS[0].fields[2]} group={group.id} entry={entry} score={score} bump={bump} />
               <div className="row">
                 <div className="row-top">
                   <span className="row-label">Water</span>
@@ -196,10 +233,86 @@ export function DailyLog({ entry, score, onChange }: Props) {
           )}
 
           {group.id !== "physical" &&
-            group.fields.map((row) => <Stepper key={row.field} row={row} group={group.id} entry={entry} bump={bump} />)}
+            group.fields.map((row) => (
+              <Stepper key={row.field} row={row} group={group.id} entry={entry} score={score} bump={bump} />
+            ))}
         </section>
       ))}
     </>
+  );
+}
+
+function DayPicker({
+  today,
+  selected,
+  entries,
+  onPick,
+}: {
+  today: string;
+  selected: string;
+  entries: EntryMap;
+  onPick: (day: string) => void;
+}) {
+  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
+  return (
+    <div className="day-picker" role="group" aria-label="Choose a day to log">
+      {days.map((day) => {
+        const logged = isLogged(entries[day]);
+        return (
+          <button
+            key={day}
+            className="day-chip"
+            aria-pressed={day === selected}
+            aria-label={`${dayLong(day)}${logged ? ", logged" : ""}`}
+            onClick={() => onPick(day)}
+          >
+            <span className="dow">{day === today ? "Today" : dayShortWeekday(day)}</span>
+            <strong>{dayOfMonth(day)}</strong>
+            <span className={`mark ${logged ? "on" : ""}`} aria-hidden="true" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Destination({
+  leagues,
+  selected,
+  onChange,
+}: {
+  leagues: League[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const names = leagues.filter((l) => selected.includes(l.id)).map((l) => l.name);
+  const summary = names.length === 0 ? "Personal only" : `Personal + ${names.join(", ")}`;
+
+  const toggle = (id: string) =>
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+
+  return (
+    <details className="dest">
+      <summary>
+        <span className="dest-label">Counts toward</span>
+        <span className="dest-value">{summary}</span>
+      </summary>
+      <div className="dest-panel">
+        <label className="check">
+          <input type="checkbox" checked disabled />
+          <span>Personal (always)</span>
+        </label>
+        {leagues.map((league) => (
+          <label className="check" key={league.id}>
+            <input type="checkbox" checked={selected.includes(league.id)} onChange={() => toggle(league.id)} />
+            <span>{league.name}</span>
+          </label>
+        ))}
+        {leagues.length === 0 && (
+          <p className="dest-note">Create or join a league on the Leagues tab to count entries there too.</p>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -207,14 +320,16 @@ function Stepper({
   row,
   group,
   entry,
+  score,
   bump,
 }: {
   row: StepperRow;
   group: Group;
   entry: DayEntry;
+  score: DayScore;
   bump: (row: StepperRow, direction: 1 | -1) => void;
 }) {
-  const points = rowPoints({ [row.field]: entry[row.field] });
+  const points = score.categories[row.category];
   return (
     <div className="row">
       <div className="row-top">

@@ -10,7 +10,13 @@ interface League {
   invite_code: string;
 }
 
-export function LeaguesPanel({ session }: { session: Session | null }) {
+export function LeaguesPanel({
+  session,
+  onLeaguesChanged,
+}: {
+  session: Session | null;
+  onLeaguesChanged?: () => void;
+}) {
   const [leagues, setLeagues] = useState<League[]>([]);
   const [name, setName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -56,6 +62,7 @@ export function LeaguesPanel({ session }: { session: Session | null }) {
     else {
       setName("");
       await load();
+      onLeaguesChanged?.();
     }
     setBusy(false);
   };

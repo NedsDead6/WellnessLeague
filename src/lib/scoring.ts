@@ -4,6 +4,7 @@
 // and the whole app follows.
 
 export type Pillar = "physical" | "mental" | "spiritual";
+export type Group = Pillar | "penalty";
 
 /** One day of entries, in natural units. */
 export interface DayEntry {
@@ -45,6 +46,48 @@ export const EMPTY_DAY: DayEntry = {
   cigarettes: 0,
 };
 
+export type CategoryKey =
+  | "exercise"
+  | "steps"
+  | "meals"
+  | "sleep"
+  | "water"
+  | "meditation"
+  | "work"
+  | "social"
+  | "reading"
+  | "journal"
+  | "worship"
+  | "service"
+  | "screen"
+  | "drinks"
+  | "weed"
+  | "cigarettes";
+
+export const CATEGORIES: { key: CategoryKey; label: string; group: Group }[] = [
+  { key: "exercise", label: "Exercise", group: "physical" },
+  { key: "steps", label: "Steps", group: "physical" },
+  { key: "meals", label: "Healthy meals", group: "physical" },
+  { key: "sleep", label: "Sleep", group: "physical" },
+  { key: "water", label: "Water", group: "physical" },
+  { key: "meditation", label: "Meditation", group: "mental" },
+  { key: "work", label: "Work", group: "mental" },
+  { key: "social", label: "Social time", group: "mental" },
+  { key: "reading", label: "Reading", group: "mental" },
+  { key: "journal", label: "Journaling or gratitude", group: "mental" },
+  { key: "worship", label: "Worship and prayer", group: "spiritual" },
+  { key: "service", label: "Service or volunteering", group: "spiritual" },
+  { key: "screen", label: "Screen time (non-work)", group: "penalty" },
+  { key: "drinks", label: "Alcoholic drinks", group: "penalty" },
+  { key: "weed", label: "Weed", group: "penalty" },
+  { key: "cigarettes", label: "Cigarettes", group: "penalty" },
+];
+
+export type CategoryPoints = Record<CategoryKey, number>;
+
+export const emptyCategoryPoints = (): CategoryPoints =>
+  Object.fromEntries(CATEGORIES.map((c) => [c.key, 0])) as CategoryPoints;
+
 const capped = (value: number, perUnit: number, pointsPerUnit: number, maxPoints: number) =>
   Math.min(maxPoints, Math.floor(Math.max(0, value) / perUnit) * pointsPerUnit);
 
@@ -55,6 +98,28 @@ export function sleepPoints(hours: number): number {
   return 0;
 }
 
+/** Points each category earned (or lost) for one day, before any bonuses. */
+export function categoryPoints(e: DayEntry): CategoryPoints {
+  return {
+    exercise: capped(e.exerciseMin, 30, 3, 12), // +3 per 30 min, max 2 hours
+    steps: capped(e.steps, 1000, 1, 20), // +1 per 1,000 steps
+    meals: e.meals.reduce((sum, grade) => sum + Math.min(2, Math.max(0, grade)), 0),
+    sleep: sleepPoints(e.sleepHours),
+    water: e.water ? 1 : 0,
+    meditation: capped(e.meditationMin, 15, 1, 8),
+    work: capped(e.workHours, 1, 1, 14),
+    social: capped(e.socialHours, 1, 1, 6),
+    reading: capped(e.readingMin, 30, 1, 4),
+    journal: Math.min(3, Math.max(0, e.journalEntries)),
+    worship: capped(e.worshipMin, 15, 1, 8),
+    service: capped(e.serviceHours, 1, 1, 4),
+    screen: -Math.floor(Math.max(0, e.screenHours)),
+    drinks: -0.5 * Math.max(0, e.drinks),
+    weed: -5 * Math.max(0, e.weed),
+    cigarettes: -0.5 * Math.max(0, e.cigarettes),
+  };
+}
+
 export interface DayScore {
   physical: number;
   mental: number;
@@ -63,38 +128,26 @@ export interface DayScore {
   balanceBonus: number;
   streakBonus: number;
   total: number;
+  categories: CategoryPoints;
 }
 
 /**
- * @param streakDays Consecutive days logged, counting today. The streak bonus
- *   (+2) lands on every 7th consecutive day.
+ * @param streakDays Consecutive days logged, counting this one. The streak
+ *   bonus (+2) lands on every 7th consecutive day.
  */
 export function scoreDay(e: DayEntry, streakDays: number): DayScore {
-  const physical =
-    capped(e.exerciseMin, 30, 3, 12) + // +3 per 30 min, max 2 hours
-    capped(e.steps, 1000, 1, 20) + // +1 per 1,000 steps
-    e.meals.reduce((sum, grade) => sum + Math.min(2, Math.max(0, grade)), 0) +
-    sleepPoints(e.sleepHours) +
-    (e.water ? 1 : 0);
+  const categories = categoryPoints(e);
+  const sumOf = (group: Group) =>
+    CATEGORIES.filter((c) => c.group === group).reduce((sum, c) => sum + categories[c.key], 0);
 
-  const mental =
-    capped(e.meditationMin, 15, 1, 8) +
-    capped(e.workHours, 1, 1, 14) +
-    capped(e.socialHours, 1, 1, 6) +
-    capped(e.readingMin, 30, 1, 4) +
-    Math.min(3, Math.max(0, e.journalEntries));
-
-  const spiritual = capped(e.worshipMin, 15, 1, 8) + capped(e.serviceHours, 1, 1, 4);
-
-  const penalties =
-    -Math.floor(Math.max(0, e.screenHours)) -
-    0.5 * Math.max(0, e.drinks) -
-    5 * Math.max(0, e.weed) -
-    0.5 * Math.max(0, e.cigarettes);
+  const physical = sumOf("physical");
+  const mental = sumOf("mental");
+  const spiritual = sumOf("spiritual");
+  const penalties = sumOf("penalty");
 
   const balanceBonus = physical > 0 && mental > 0 && spiritual > 0 ? 2 : 0;
   const streakBonus = streakDays > 0 && streakDays % 7 === 0 ? 2 : 0;
   const total = physical + mental + spiritual + penalties + balanceBonus + streakBonus;
 
-  return { physical, mental, spiritual, penalties, balanceBonus, streakBonus, total };
+  return { physical, mental, spiritual, penalties, balanceBonus, streakBonus, total, categories };
 }

@@ -1,70 +1,110 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AuthScreen } from "./AuthScreen";
 import { DailyLog } from "./DailyLog";
 import { LeaguesPanel } from "./LeaguesPanel";
 import { Leaderboard } from "./Leaderboard";
+import { Personal } from "./Personal";
+import { dayKey, periodLabel } from "@/lib/dates";
+import { currentStreak, streakAt } from "@/lib/history";
 import { EMPTY_DAY, scoreDay, type DayEntry } from "@/lib/scoring";
 import { supabase } from "@/lib/supabase";
+import { useEntries } from "@/lib/useEntries";
+import { useLeagues } from "@/lib/useLeagues";
 import { useSession } from "@/lib/useSession";
 
-// Demo values so the first screen isn't empty. Real data replaces these once
-// entries are saved to the database.
-const DEMO_ENTRY: DayEntry = {
-  ...EMPTY_DAY,
-  exerciseMin: 30,
-  steps: 6000,
-  meals: [2, 1, 0],
-  sleepHours: 7.5,
-  workHours: 6,
-  socialHours: 1,
-  screenHours: 2,
+type Tab = "log" | "personal" | "board" | "leagues";
+
+const TITLES: Record<Tab, string> = {
+  log: "Daily log",
+  personal: "Personal",
+  board: "Leaderboard",
+  leagues: "Leagues",
 };
-const DEMO_PRIOR_STREAK = 6;
 
-type Tab = "log" | "board" | "leagues";
-
-const TITLES: Record<Tab, string> = { log: "Daily log", board: "Leaderboard", leagues: "Leagues" };
+function Loading() {
+  return (
+    <div className="shell">
+      <main className="main">
+        <p className="callout">Loading...</p>
+      </main>
+    </div>
+  );
+}
 
 export function App() {
   const { session, ready } = useSession();
+  const userId = session?.user.id;
+  const { leagues, reload: reloadLeagues } = useLeagues(userId);
+  const { entries, shared, loaded, status, error, save } = useEntries(userId);
+
   const [tab, setTab] = useState<Tab>("log");
-  const [entry, setEntry] = useState<DayEntry>(DEMO_ENTRY);
+  // Dates are filled in after the page loads so the server and browser agree.
+  const [today, setToday] = useState("");
+  const [day, setDay] = useState("");
+  useEffect(() => {
+    const key = dayKey(new Date());
+    setToday(key);
+    setDay(key);
+  }, []);
 
-  // Logging today extends the streak by one day.
-  const score = useMemo(() => scoreDay(entry, DEMO_PRIOR_STREAK + 1), [entry]);
+  const entry: DayEntry = entries[day] ?? EMPTY_DAY;
 
-  const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  // A day with no saved entry yet starts with the same leagues as the latest saved day.
+  const defaultLeagueIds = useMemo(() => {
+    const latest = Object.keys(entries).sort().pop();
+    return latest ? (shared[latest] ?? []) : [];
+  }, [entries, shared]);
 
-  // When the database is connected, people must sign in first.
-  if (supabase && !ready) {
-    return (
-      <div className="shell">
-        <main className="main">
-          <p className="callout">Loading...</p>
-        </main>
-      </div>
-    );
-  }
-  if (supabase && !session) {
-    return <AuthScreen />;
-  }
+  const selectedLeagueIds = useMemo(() => {
+    const chosen = entries[day] !== undefined ? (shared[day] ?? []) : defaultLeagueIds;
+    return chosen.filter((id) => leagues.some((l) => l.id === id));
+  }, [entries, shared, day, defaultLeagueIds, leagues]);
+
+  const score = useMemo(() => scoreDay(entry, streakAt(entries, day)), [entry, entries, day]);
+
+  const todayTotal = useMemo(
+    () => scoreDay(entries[today] ?? EMPTY_DAY, streakAt(entries, today)).total,
+    [entries, today],
+  );
+  const streak = useMemo(() => (today ? currentStreak(entries, today) : 0), [entries, today]);
+
+  if (!today) return <Loading />;
+  if (supabase && !ready) return <Loading />;
+  if (supabase && !session) return <AuthScreen />;
+  if (!loaded) return <Loading />;
 
   return (
     <div className="shell">
       <header className="head">
         <div>
-          <div className="kicker">{tab === "log" ? `${today} · Friends League` : "Wellness League"}</div>
+          <div className="kicker">{tab === "log" ? periodLabel(day, "day") : "Wellness League"}</div>
           <h1 className="title">{TITLES[tab]}</h1>
         </div>
-        <span className="streak">{DEMO_PRIOR_STREAK + 1}-day streak</span>
+        <span className="streak">{streak}-day streak</span>
       </header>
 
       <main className="main">
-        {tab === "log" && <DailyLog entry={entry} score={score} onChange={setEntry} />}
-        {tab === "board" && <Leaderboard todayTotal={score.total} />}
-        {tab === "leagues" && <LeaguesPanel session={session} />}
+        {tab === "log" && (
+          <DailyLog
+            day={day}
+            today={today}
+            entries={entries}
+            entry={entry}
+            score={score}
+            onChange={(next) => save(day, next, selectedLeagueIds)}
+            onPickDay={setDay}
+            leagues={leagues}
+            selectedLeagueIds={selectedLeagueIds}
+            onLeaguesChange={(ids) => save(day, entry, ids)}
+            status={status}
+            error={error}
+          />
+        )}
+        {tab === "personal" && <Personal entries={entries} today={today} />}
+        {tab === "board" && <Leaderboard todayTotal={todayTotal} />}
+        {tab === "leagues" && <LeaguesPanel session={session} onLeaguesChanged={reloadLeagues} />}
       </main>
 
       <nav className="nav" aria-label="Main">
@@ -75,6 +115,12 @@ export function App() {
               <path d="M9 4.5h6M9 13l2.2 2.2L15.5 11" />
             </svg>
             Daily log
+          </button>
+          <button aria-current={tab === "personal" ? "page" : undefined} onClick={() => setTab("personal")}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 20V11M12 20V5M19 20v-7" />
+            </svg>
+            Personal
           </button>
           <button aria-current={tab === "board" ? "page" : undefined} onClick={() => setTab("board")}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
