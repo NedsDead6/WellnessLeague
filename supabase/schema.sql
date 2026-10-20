@@ -1,4 +1,4 @@
--- Wellness League database schema (Supabase / Postgres).
+-- Own Your Day database schema (Supabase / Postgres).
 -- Run this once in the Supabase dashboard: SQL Editor -> New query -> paste -> Run.
 -- It is not used by the app yet; milestone 2 (accounts and leagues) connects to it.
 

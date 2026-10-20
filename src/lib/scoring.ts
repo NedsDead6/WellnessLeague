@@ -1,4 +1,4 @@
-// Scoring rules for Wellness League. Pure functions only, so the same code can
+// Scoring rules for Own Your Day. Pure functions only, so the same code can
 // score entries in the browser now and on the server later.
 // Every rule below comes from the plan's scoring table. Change numbers here,
 // and the whole app follows.

@@ -1,4 +1,4 @@
-# Wellness League
+# Own Your Day
 
 Fantasy-football-style wellness leagues: create a league, invite friends, and log physical, mental and spiritual habits to earn points.
 

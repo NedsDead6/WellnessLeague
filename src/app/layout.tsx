@@ -14,7 +14,7 @@ const body = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Wellness League",
+  title: "Own Your Day",
   description: "Log physical, mental and spiritual habits with friends and earn points.",
 };
 

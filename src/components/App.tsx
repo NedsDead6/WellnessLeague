@@ -99,7 +99,7 @@ export function App() {
   };
 
   const heading = tab === "log" && scoringOpen ? "My scoring" : TITLES[tab];
-  const kicker = tab === "log" && !scoringOpen ? periodLabel(day, "day") : "Wellness League";
+  const kicker = tab === "log" && !scoringOpen ? periodLabel(day, "day") : "Own Your Day";
 
   return (
     <div className="shell">

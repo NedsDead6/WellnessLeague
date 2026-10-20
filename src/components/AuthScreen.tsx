@@ -36,7 +36,7 @@ export function AuthScreen({ heading, note }: { heading?: string; note?: string 
     <div className="shell">
       <header className="head">
         <div>
-          <div className="kicker">Wellness League</div>
+          <div className="kicker">Own Your Day</div>
           <h1 className="title">{heading ?? (mode === "signup" ? "Create your account" : "Welcome back")}</h1>
         </div>
       </header>
