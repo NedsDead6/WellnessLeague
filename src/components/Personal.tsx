@@ -32,14 +32,16 @@ import {
 import { BONUS_COLOR, CATEGORY_COLORS, GROUP_COLORS } from "@/lib/colors";
 import { CATEGORIES, type CategoryKey, type ScoringRules } from "@/lib/scoring";
 import { fmt, fmtSigned } from "./DailyLog";
+import { WEEKDAY_LETTERS, formatMetric, rangeTitle, tickText } from "@/lib/trends";
 import { MetricTrends } from "./MetricTrends";
 import { StackedChart, segmentsOf, type ChartBar } from "./StackedChart";
 
-const PERIODS: { id: Period; label: string; count: number; title: string }[] = [
-  { id: "day", label: "Daily", count: 14, title: "Points per day" },
-  { id: "week", label: "Weekly", count: 12, title: "Weekly average" },
-  { id: "month", label: "Monthly", count: 12, title: "Monthly average" },
-  { id: "year", label: "Yearly", count: 5, title: "Yearly average" },
+// How far back the chart reaches (scroll sideways) and how wide each bar is.
+const PERIODS: { id: Period; label: string; count: number; slot: number; title: string }[] = [
+  { id: "day", label: "Daily", count: 120, slot: 30, title: "Points per day" },
+  { id: "week", label: "Weekly", count: 52, slot: 48, title: "Weekly average" },
+  { id: "month", label: "Monthly", count: 36, slot: 46, title: "Monthly average" },
+  { id: "year", label: "Yearly", count: 10, slot: 66, title: "Yearly average" },
 ];
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -47,11 +49,10 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 export function Personal({ entries, today, rules }: { entries: EntryMap; today: string; rules: ScoringRules }) {
   const history = useMemo(() => scoreHistory(entries, rules), [entries, rules]);
   const [period, setPeriod] = useState<Period>("day");
-  const [offset, setOffset] = useState(0);
 
   const config = PERIODS.find((p) => p.id === period) ?? PERIODS[0];
   const currentStart = periodStart(today, period);
-  const anchor = shiftPeriod(currentStart, period, offset);
+  const anchor = currentStart;
   const anchorEnd = periodEnd(anchor, period);
   const previous = shiftPeriod(anchor, period, -1);
 
@@ -69,10 +70,7 @@ export function Personal({ entries, today, rules }: { entries: EntryMap; today: 
     [history, period, anchor, config.count],
   );
 
-  const choosePeriod = (next: Period) => {
-    setPeriod(next);
-    setOffset(0);
-  };
+  const choosePeriod = (next: Period) => setPeriod(next);
 
   if (history.length === 0) {
     return (
@@ -92,23 +90,6 @@ export function Personal({ entries, today, rules }: { entries: EntryMap; today: 
         ))}
       </div>
 
-      <div className="period-nav">
-        <button className="square" aria-label={`Previous ${period}`} onClick={() => setOffset(offset - 1)}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M15 5l-7 7 7 7" />
-          </svg>
-        </button>
-        <div className="period-label" aria-live="polite">
-          {periodLabel(anchor, period)}
-          {offset === 0 && <span className="period-now">{period === "day" ? "Today" : `This ${period}`}</span>}
-        </div>
-        <button className="square" aria-label={`Next ${period}`} disabled={offset >= 0} onClick={() => setOffset(offset + 1)}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-
       <Summary
         period={period}
         now={now}
@@ -116,7 +97,7 @@ export function Personal({ entries, today, rules }: { entries: EntryMap; today: 
         best={best}
         length={diffDays(anchorEnd, anchor) + 1}
         previousLabel={periodLabel(previous, period)}
-        partial={offset === 0 && period !== "day"}
+        partial={period !== "day"}
       />
 
       <section aria-label="Trend">
@@ -124,20 +105,10 @@ export function Personal({ entries, today, rules }: { entries: EntryMap; today: 
           <span className="name">{config.title}</span>
           {period !== "day" && <span className="sum">per logged day</span>}
         </div>
-        <TrendChart series={series} period={period} selectedStart={anchor} title={config.title} />
-      </section>
-
-      <section aria-label="Where your points come from">
-        <div className="group-head">
-          <span className="name">Where the points come from</span>
-          <span className="sum">{period === "day" ? "that day" : "per logged day"}</span>
-        </div>
-        <Breakdown totals={averageOf(now)} />
+        <TrendChart series={series} period={period} selectedStart={anchor} title={config.title} slot={config.slot} />
       </section>
 
       <Calendar history={history} today={today} />
-
-      <Streaks entries={entries} history={history} today={today} />
 
       <MetricTrends entries={entries} today={today} />
     </>
@@ -224,16 +195,19 @@ function TrendChart({
   period,
   selectedStart,
   title,
+  slot,
 }: {
   series: SeriesPoint[];
   period: Period;
   selectedStart: string;
   title: string;
+  slot: number;
 }) {
   const n = series.length;
   const bars: ChartBar[] = series.map((p) => ({
     key: p.start,
-    label: axisLabel(p.start, period),
+    label: period === "day" ? WEEKDAY_LETTERS[weekdayIndex(p.start)] : axisLabel(p.start, period),
+    label2: period === "day" ? String(dayOfMonth(p.start)) : undefined,
     title: periodLabel(p.start, period),
     sub:
       period === "day"
@@ -248,7 +222,9 @@ function TrendChart({
     <>
       <StackedChart
         bars={bars}
-        labelEvery={n > 8 ? 2 : 1}
+        scrollSlot={slot}
+        scrollKey={period}
+        titleFor={(first, last) => rangeTitle(period, series[first].start, series[last].start)}
         ariaLabel={`${title} for the last ${n} ${period === "day" ? "days" : `${period}s`}`}
       />
 
@@ -263,7 +239,7 @@ function TrendChart({
             </tr>
           </thead>
           <tbody>
-            {[...series].reverse().map((p) => (
+            {[...series].slice(-30).reverse().map((p) => (
               <tr key={p.start}>
                 <th scope="row">{periodLabel(p.start, period)}</th>
                 <td>{p.loggedDays ? fmt(round1(p.average.total)) : "-"}</td>
@@ -277,60 +253,44 @@ function TrendChart({
   );
 }
 
-function Breakdown({ totals }: { totals: Totals }) {
-  const pillars = [
-    { label: "Physical", value: totals.physical, color: GROUP_COLORS.physical },
-    { label: "Mental", value: totals.mental, color: GROUP_COLORS.mental },
-    { label: "Spiritual", value: totals.spiritual, color: GROUP_COLORS.spiritual },
-    { label: "Penalties", value: totals.penalties, color: GROUP_COLORS.penalty },
-    { label: "Bonuses", value: totals.bonuses, color: BONUS_COLOR },
-  ];
-  const categories = CATEGORIES.map((c) => ({
-    label: c.label,
-    value: totals.categories[c.key],
-    color: CATEGORY_COLORS[c.key as CategoryKey],
-  }))
-    .filter((c) => Math.abs(c.value) > 0.0005)
-    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+const CAL_METRICS = [
+  { id: "points", label: "Points" },
+  { id: "exercise", label: "Exercise time" },
+  { id: "steps", label: "Steps" },
+  { id: "sleep", label: "Sleep time" },
+  { id: "work", label: "Hours worked" },
+] as const;
 
-  if (totals.loggedDays === 0) {
-    return <p className="callout">Nothing logged in this period yet.</p>;
+type CalMetric = (typeof CAL_METRICS)[number]["id"];
+
+function calValue(day: ScoredDay, metric: CalMetric): number {
+  switch (metric) {
+    case "points":
+      return day.score.total;
+    case "exercise":
+      return day.entry.exerciseMin;
+    case "steps":
+      return day.entry.steps;
+    case "sleep":
+      return day.entry.sleepHours;
+    case "work":
+      return day.entry.workHours;
   }
-
-  const maxPillar = Math.max(1, ...pillars.map((p) => Math.abs(p.value)));
-  const maxCategory = Math.max(1, ...categories.map((c) => Math.abs(c.value)));
-
-  return (
-    <div className="breakdown">
-      {pillars.map((p) => (
-        <div className="bd-row" key={p.label}>
-          <span className="bd-label">{p.label}</span>
-          <span className="bd-track">
-            <span className="bd-fill" style={{ width: `${(Math.abs(p.value) / maxPillar) * 100}%`, background: p.color }} />
-          </span>
-          <span className="bd-value">{fmtSigned(round1(p.value))}</span>
-        </div>
-      ))}
-      <div className="bd-divider" role="presentation" />
-      {categories.map((c) => (
-        <div className="bd-row small" key={c.label}>
-          <span className="bd-label">{c.label}</span>
-          <span className="bd-track">
-            <span className="bd-fill" style={{ width: `${(Math.abs(c.value) / maxCategory) * 100}%`, background: c.color }} />
-          </span>
-          <span className="bd-value">{fmtSigned(round1(c.value))}</span>
-        </div>
-      ))}
-    </div>
-  );
 }
+
+/** Red for the lowest, through orange and yellow, to green for the highest. */
+const heat = (t: number) => `hsl(${Math.round(Math.max(0, Math.min(1, t)) * 120)} 88% 52%)`;
 
 function Calendar({ history, today }: { history: ScoredDay[]; today: string }) {
   const thisMonth = periodStart(today, "month");
   const [month, setMonth] = useState(thisMonth);
+  const [metric, setMetric] = useState<CalMetric>("points");
 
   const byDay = useMemo(() => new Map(history.map((d) => [d.day, d])), [history]);
-  const best = useMemo(() => Math.max(1, ...history.map((d) => d.score.total)), [history]);
+  const best = useMemo(() => Math.max(0.0001, ...history.map((d) => calValue(d, metric))), [history, metric]);
+  const label = CAL_METRICS.find((m) => m.id === metric)!.label;
+  const show = (v: number) => (metric === "points" ? fmt(round1(v)) : tickText(metric, v));
+  const long = (v: number) => (metric === "points" ? `${fmt(round1(v))} points` : formatMetric(metric, v));
 
   const blanks = weekdayIndex(month);
   const cells = Array.from({ length: daysInMonth(month) }, (_, i) => addDays(month, i));
@@ -340,6 +300,18 @@ function Calendar({ history, today }: { history: ScoredDay[]; today: string }) {
       <div className="group-head">
         <span className="name">Calendar</span>
       </div>
+
+      <label className="cal-pick">
+        <span>Show</span>
+        <select className="select" value={metric} onChange={(e) => setMetric(e.target.value as CalMetric)} aria-label="Calendar shows">
+          {CAL_METRICS.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
       <div className="period-nav">
         <button className="square" aria-label="Previous month" onClick={() => setMonth(addMonths(month, -1))}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -356,7 +328,7 @@ function Calendar({ history, today }: { history: ScoredDay[]; today: string }) {
         </button>
       </div>
 
-      <div className="cal" role="group" aria-label={`Daily points for ${monthTitle(month)}`}>
+      <div className="cal" role="group" aria-label={`${label} for ${monthTitle(month)}`}>
         {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
           <span className="cal-dow" key={i} aria-hidden="true">
             {d}
@@ -368,53 +340,29 @@ function Calendar({ history, today }: { history: ScoredDay[]; today: string }) {
         {cells.map((day) => {
           const scored = byDay.get(day);
           const future = day > today;
-          let level = "";
-          if (scored) level = scored.score.total <= 0 ? "l0" : `l${Math.min(4, Math.ceil((4 * scored.score.total) / best))}`;
-          const label = scored
-            ? `${dayLong(day)}: ${fmt(round1(scored.score.total))} points`
+          const value = scored ? calValue(scored, metric) : 0;
+          const text = scored
+            ? `${dayLong(day)}: ${long(value)}`
             : `${dayLong(day)}: ${future ? "upcoming" : "not logged"}`;
           return (
-            <div key={day} className={`cal-cell ${level} ${future ? "future" : ""}`} role="img" aria-label={label} title={label}>
+            <div
+              key={day}
+              className={`cal-cell ${scored ? "heat" : ""} ${future ? "future" : ""}`}
+              style={scored ? { background: heat(value / best) } : undefined}
+              role="img"
+              aria-label={text}
+              title={text}
+            >
               <span className="n">{dayOfMonth(day)}</span>
-              {scored && <span className="p">{fmt(round1(scored.score.total))}</span>}
+              {scored && <span className="p">{show(value)}</span>}
             </div>
           );
         })}
       </div>
       <div className="cal-legend" aria-hidden="true">
-        <span>Less</span>
-        <i className="cal-cell l1" />
-        <i className="cal-cell l2" />
-        <i className="cal-cell l3" />
-        <i className="cal-cell l4" />
-        <span>More</span>
-      </div>
-    </section>
-  );
-}
-
-function Streaks({ entries, history, today }: { entries: EntryMap; history: ScoredDay[]; today: string }) {
-  return (
-    <section aria-label="Streaks">
-      <div className="group-head">
-        <span className="name">Streaks</span>
-      </div>
-      <div className="stat-grid">
-        <div className="stat">
-          <div className="stat-label">Current streak</div>
-          <div className="stat-value">{currentStreak(entries, today)}</div>
-          <div className="stat-delta flat">days in a row</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Best streak</div>
-          <div className="stat-value">{bestStreak(history)}</div>
-          <div className="stat-delta flat">days in a row</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Days logged</div>
-          <div className="stat-value">{history.length}</div>
-          <div className="stat-delta flat">all time</div>
-        </div>
+        <span>Low</span>
+        <i className="cal-gradient" />
+        <span>High ({show(best)})</span>
       </div>
     </section>
   );

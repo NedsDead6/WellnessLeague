@@ -2216,3 +2216,44 @@ button:focus-visible {
   font-size: 12px;
   color: var(--muted);
 }
+
+/* Calendar heat map */
+.cal-cell.heat {
+  color: var(--on-neon);
+  border-color: transparent;
+}
+
+.cal-cell.heat .n {
+  opacity: 0.75;
+  font-weight: 600;
+}
+
+.cal-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.cal-pick .select {
+  flex: 1;
+}
+
+.cal-gradient {
+  width: 120px;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, hsl(0 88% 52%), hsl(30 88% 52%), hsl(60 88% 52%), hsl(90 88% 52%), hsl(120 88% 52%));
+}
+
+.cal-legend {
+  justify-content: center;
+}
+
+.trend + .stat-grid,
+.trend ~ .stat-grid {
+  margin-top: 12px;
+}

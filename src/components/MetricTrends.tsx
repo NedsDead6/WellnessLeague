@@ -135,26 +135,6 @@ export function MetricTrends({ entries, today }: { entries: EntryMap; today: str
         </div>
       )}
 
-      <div className="stat-grid">
-        <div className="stat">
-          <div className="stat-label">{period === "day" ? "Today" : `This ${config.noun}`}</div>
-          <div className="stat-value small">{latest.days > 0 ? formatMetric(metric, valueOf(latest)) : "-"}</div>
-          <div className="stat-delta flat">
-            {delta === null ? "No earlier data" : `${delta >= 0 ? "+" : "-"}${formatMetric(metric, Math.abs(delta))} vs previous`}
-          </div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Best {config.noun}</div>
-          <div className="stat-value small">{hasAny ? formatMetric(metric, valueOf(series[bestIdx])) : "-"}</div>
-          <div className="stat-delta flat">{hasAny ? periodLabel(series[bestIdx].start, period) : "Nothing logged"}</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">All time</div>
-          <div className="stat-value small">{everything.days > 0 ? formatMetric(metric, allTimeValue) : "-"}</div>
-          <div className="stat-delta flat">{everything.days > 0 ? `${word.toLowerCase()}, ${everything.days} ${everything.days === 1 ? "day" : "days"}` : "Nothing logged"}</div>
-        </div>
-      </div>
-
       <div className="trend">
         <div className="trend-month" aria-live="polite">
           {title || " "}
@@ -258,6 +238,26 @@ export function MetricTrends({ entries, today }: { entries: EntryMap; today: str
           )}
         </div>
         <p className="trend-hint">Swipe or scroll sideways to look further back.</p>
+      </div>
+
+      <div className="stat-grid">
+        <div className="stat">
+          <div className="stat-label">{period === "day" ? "Today" : `This ${config.noun}`}</div>
+          <div className="stat-value small">{latest.days > 0 ? formatMetric(metric, valueOf(latest)) : "-"}</div>
+          <div className="stat-delta flat">
+            {delta === null ? "No earlier data" : `${delta >= 0 ? "+" : "-"}${formatMetric(metric, Math.abs(delta))} vs previous`}
+          </div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">Best {config.noun}</div>
+          <div className="stat-value small">{hasAny ? formatMetric(metric, valueOf(series[bestIdx])) : "-"}</div>
+          <div className="stat-delta flat">{hasAny ? periodLabel(series[bestIdx].start, period) : "Nothing logged"}</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">All time</div>
+          <div className="stat-value small">{everything.days > 0 ? formatMetric(metric, allTimeValue) : "-"}</div>
+          <div className="stat-delta flat">{everything.days > 0 ? `${word.toLowerCase()}, ${everything.days} ${everything.days === 1 ? "day" : "days"}` : "Nothing logged"}</div>
+        </div>
       </div>
       {!hasAny && <p className="demo-note">Nothing logged for {info.label.toLowerCase()} yet.</p>}
       {effective === "average" && <p className="demo-note">Averages only count days where you logged {info.label.toLowerCase()}.</p>}

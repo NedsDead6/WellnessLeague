@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BONUS_COLOR, CATEGORY_COLORS } from "@/lib/colors";
 import type { Totals } from "@/lib/history";
 import { CATEGORIES, type CategoryKey } from "@/lib/scoring";
@@ -33,6 +33,8 @@ export interface ChartBar {
   key: string;
   /** Short text under the bar. */
   label: string;
+  /** A second line under the label (for example the date under a weekday letter). Scrolling charts only. */
+  label2?: string;
   /** Heading of the hover breakdown. */
   title: string;
   /** Smaller line under the heading, e.g. what the number is an average of. */
@@ -53,21 +55,64 @@ export function StackedChart({
   ariaLabel,
   labelEvery = 1,
   emptyText = "Nothing logged",
+  scrollSlot,
+  scrollKey,
+  titleFor,
 }: {
   bars: ChartBar[];
   ariaLabel: string;
   labelEvery?: number;
   emptyText?: string;
+  /** Gives every bar this many pixels and lets the chart scroll sideways, starting at the newest bar. */
+  scrollSlot?: number;
+  /** Changing this puts a scrolling chart back at the newest bar. */
+  scrollKey?: string;
+  /** The heading above a scrolling chart, from the first and last bar on screen. */
+  titleFor?: (first: number, last: number) => string;
 }) {
   const [active, setActive] = useState<number | null>(null);
+  const [view, setView] = useState({ left: 0, width: 320 });
+  const scroller = useRef<HTMLDivElement>(null);
+  const frame = useRef<number | null>(null);
+  const slotPx = scrollSlot ?? 0;
+  const scrolling = slotPx > 0;
 
-  const W = 360;
-  const H = 220;
-  const left = 30;
-  const right = 8;
-  const top = 14;
-  const bottom = 28;
   const n = bars.length;
+  const AXIS_W = 34;
+  const W = scrolling ? n * slotPx : 360;
+  const H = scrolling ? 236 : 220;
+  const left = scrolling ? 0 : 30;
+  const right = scrolling ? 0 : 8;
+  const top = 14;
+  const bottom = scrolling ? 42 : 28;
+
+  const measure = useCallback(() => {
+    const el = scroller.current;
+    if (!el) return;
+    setView((v) => (v.left === el.scrollLeft && v.width === el.clientWidth ? v : { left: el.scrollLeft, width: el.clientWidth }));
+  }, []);
+
+  const onScroll = () => {
+    if (frame.current !== null) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null;
+      measure();
+    });
+  };
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    el.scrollLeft = el.scrollWidth;
+    setActive(null);
+    measure();
+  }, [scrollKey, measure]);
+
+  useEffect(() => {
+    if (!scrolling) return;
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [scrolling, measure]);
 
   const stacks = bars.map((b) => b.segments);
   const posSum = stacks.map((segs) => segs.reduce((sum, seg) => sum + Math.max(0, seg.value), 0));
@@ -79,8 +124,8 @@ export function StackedChart({
   const plotH = H - top - bottom;
   const y = (v: number) => top + ((max - v) / span) * plotH;
   const y0 = y(0);
-  const slot = (W - left - right) / n;
-  const barW = Math.min(30, slot * 0.7);
+  const slot = scrolling ? slotPx : (W - left - right) / n;
+  const barW = Math.min(scrolling ? 22 : 30, slot * 0.7);
   const ticks = [0, max / 2, max];
 
   const legend = CATEGORIES.filter((c) => stacks.some((segs) => segs.some((seg) => seg.key === c.key)));
@@ -90,93 +135,142 @@ export function StackedChart({
   const tipSegments = active === null ? [] : [...stacks[active]].sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
   const tipTotal = tipSegments.reduce((sum, seg) => sum + seg.value, 0);
   const tipX = active === null ? 0 : left + slot * (active + 0.5);
+  const step = scrolling ? slotPx : 1;
+  const firstVisible = Math.max(0, Math.min(n - 1, Math.floor(view.left / step)));
+  const lastVisible = Math.max(firstVisible, Math.min(n - 1, Math.ceil((view.left + view.width) / step) - 1));
+  const tipLeft = scrolling
+    ? AXIS_W + Math.min(Math.max(tipX - view.left, 108), Math.max(108, view.width - 108))
+    : Math.min(76, Math.max(24, (tipX / W) * 100));
+
+  const plot = (
+    <svg className={scrolling ? "trend-svg" : "chart"} {...(scrolling ? { width: W, height: H } : { viewBox: `0 0 ${W} ${H}` })} role="group" aria-label={ariaLabel}>
+      {ticks.map((t) => (
+        <g key={t}>
+          <line className={t === 0 ? "chart-axis" : "chart-grid"} x1={left} x2={W - right} y1={y(t)} y2={y(t)} />
+          {!scrolling && (
+            <text className="chart-tick" x={left - 6} y={y(t) + 3.5} textAnchor="end">
+              {fmt(round1(t))}
+            </text>
+          )}
+        </g>
+      ))}
+      {bars.map((bar, i) => {
+        const cx = left + slot * (i + 0.5);
+        let up = y0;
+        let down = y0;
+        const dim = active !== null && active !== i;
+        const total = bar.segments.reduce((sum, seg) => sum + seg.value, 0);
+        const selected = bar.marked ? "selected" : "";
+        return (
+          <g key={bar.key} opacity={dim ? 0.4 : 1}>
+            {bar.hasData ? (
+              bar.segments.map((seg) => {
+                const h = Math.max(1.5, (Math.abs(seg.value) / span) * plotH);
+                let rectY: number;
+                if (seg.value >= 0) {
+                  up -= h;
+                  rectY = up;
+                } else {
+                  rectY = down;
+                  down += h;
+                }
+                return <rect key={seg.key} className="chart-seg" x={cx - barW / 2} y={rectY} width={barW} height={h} fill={seg.color} />;
+              })
+            ) : (
+              <rect className="chart-empty" x={cx - barW / 2} y={y0 - 1} width={barW} height={2} />
+            )}
+            {(n - 1 - i) % labelEvery === 0 &&
+              (bar.label2 !== undefined ? (
+                <>
+                  <text className={`chart-label ${selected}`} x={cx} y={H - 24} textAnchor="middle">
+                    {bar.label}
+                  </text>
+                  <text className={`chart-label ${selected}`} x={cx} y={H - 10} textAnchor="middle">
+                    {bar.label2}
+                  </text>
+                </>
+              ) : (
+                <text className={`chart-label ${selected}`} x={cx} y={H - 9} textAnchor="middle">
+                  {bar.label}
+                </text>
+              ))}
+            {bar.marked && <rect className="chart-mark" x={cx - barW / 2} y={H - 4} width={barW} height={2} rx={1} />}
+            <rect
+              className="chart-hit"
+              x={cx - slot / 2}
+              y={top}
+              width={slot}
+              height={H - top}
+              tabIndex={0}
+              role="button"
+              aria-label={`${bar.title}: ${bar.hasData ? `${fmt(round1(total))} points` : emptyText.toLowerCase()}. Show breakdown.`}
+              onMouseEnter={() => setActive(i)}
+              onFocus={() => setActive(i)}
+              onBlur={() => setActive(null)}
+              onClick={() => setActive(active === i ? null : i)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setActive(null);
+              }}
+            />
+          </g>
+        );
+      })}
+    </svg>
+  );
+
+  const tipBox = tip && (
+    <div className={`chart-tip ${scrolling ? "trend-tip" : ""}`} role="status" style={{ left: scrolling ? tipLeft : `${tipLeft}%` }}>
+      <div className="tip-head">
+        <span>{tip.title}</span>
+        {tip.hasData && <strong>{fmt(round1(tipTotal))}</strong>}
+      </div>
+      {!tip.hasData ? (
+        <div className="tip-empty">{emptyText}</div>
+      ) : (
+        <>
+          {tip.sub && <div className="tip-sub">{tip.sub}</div>}
+          {tipSegments.map((seg) => (
+            <div className="tip-row" key={seg.key}>
+              <i style={{ background: seg.color }} />
+              <span>{seg.label}</span>
+              <b>{fmtSigned(round1(seg.value))}</b>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
 
   return (
     <>
-      <div className="chart-wrap" onMouseLeave={() => setActive(null)}>
-        <svg className="chart" viewBox={`0 0 ${W} ${H}`} role="group" aria-label={ariaLabel}>
-          {ticks.map((t) => (
-            <g key={t}>
-              <line className={t === 0 ? "chart-axis" : "chart-grid"} x1={left} x2={W - right} y1={y(t)} y2={y(t)} />
-              <text className="chart-tick" x={left - 6} y={y(t) + 3.5} textAnchor="end">
-                {fmt(round1(t))}
-              </text>
-            </g>
-          ))}
-          {bars.map((bar, i) => {
-            const cx = left + slot * (i + 0.5);
-            let up = y0;
-            let down = y0;
-            const dim = active !== null && active !== i;
-            const total = bar.segments.reduce((sum, seg) => sum + seg.value, 0);
-            return (
-              <g key={bar.key} opacity={dim ? 0.4 : 1}>
-                {bar.hasData ? (
-                  bar.segments.map((seg) => {
-                    const h = Math.max(1.5, (Math.abs(seg.value) / span) * plotH);
-                    let rectY: number;
-                    if (seg.value >= 0) {
-                      up -= h;
-                      rectY = up;
-                    } else {
-                      rectY = down;
-                      down += h;
-                    }
-                    return <rect key={seg.key} className="chart-seg" x={cx - barW / 2} y={rectY} width={barW} height={h} fill={seg.color} />;
-                  })
-                ) : (
-                  <rect className="chart-empty" x={cx - barW / 2} y={y0 - 1} width={barW} height={2} />
-                )}
-                {(n - 1 - i) % labelEvery === 0 && (
-                  <text className={`chart-label ${bar.marked ? "selected" : ""}`} x={cx} y={H - 9} textAnchor="middle">
-                    {bar.label}
-                  </text>
-                )}
-                {bar.marked && <rect className="chart-mark" x={cx - barW / 2} y={H - 4} width={barW} height={2} rx={1} />}
-                <rect
-                  className="chart-hit"
-                  x={cx - slot / 2}
-                  y={top}
-                  width={slot}
-                  height={H - top}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`${bar.title}: ${bar.hasData ? `${fmt(round1(total))} points` : emptyText.toLowerCase()}. Show breakdown.`}
-                  onMouseEnter={() => setActive(i)}
-                  onFocus={() => setActive(i)}
-                  onBlur={() => setActive(null)}
-                  onClick={() => setActive(active === i ? null : i)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") setActive(null);
-                  }}
-                />
-              </g>
-            );
-          })}
-        </svg>
-        {tip && (
-          <div className="chart-tip" role="status" style={{ left: `${Math.min(76, Math.max(24, (tipX / W) * 100))}%` }}>
-            <div className="tip-head">
-              <span>{tip.title}</span>
-              {tip.hasData && <strong>{fmt(round1(tipTotal))}</strong>}
+      {scrolling ? (
+        <div className="trend">
+          {titleFor && (
+            <div className="trend-month" aria-live="polite">
+              {titleFor(firstVisible, lastVisible) || "\u00a0"}
             </div>
-            {!tip.hasData ? (
-              <div className="tip-empty">{emptyText}</div>
-            ) : (
-              <>
-                {tip.sub && <div className="tip-sub">{tip.sub}</div>}
-                {tipSegments.map((seg) => (
-                  <div className="tip-row" key={seg.key}>
-                    <i style={{ background: seg.color }} />
-                    <span>{seg.label}</span>
-                    <b>{fmtSigned(round1(seg.value))}</b>
-                  </div>
-                ))}
-              </>
-            )}
+          )}
+          <div className="trend-body" onMouseLeave={() => setActive(null)}>
+            <svg className="trend-axis" width={AXIS_W} height={H} aria-hidden="true">
+              {ticks.map((t) => (
+                <text key={t} className="chart-tick" x={AXIS_W - 6} y={y(t) + 3.5} textAnchor="end">
+                  {fmt(round1(t))}
+                </text>
+              ))}
+            </svg>
+            <div className="trend-scroll" ref={scroller} onScroll={onScroll} tabIndex={0} role="region" aria-label={`${ariaLabel}. Scroll sideways for earlier data.`}>
+              {plot}
+            </div>
+            {tipBox}
           </div>
-        )}
-      </div>
+          <p className="trend-hint">Swipe or scroll sideways to look further back.</p>
+        </div>
+      ) : (
+        <div className="chart-wrap" onMouseLeave={() => setActive(null)}>
+          {plot}
+          {tipBox}
+        </div>
+      )}
 
       <ul className="legend" aria-label="Chart colors">
         {legend.map((c) => (
