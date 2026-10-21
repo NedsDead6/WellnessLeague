@@ -135,11 +135,11 @@ export function Personal({ entries, today, rules }: { entries: EntryMap; today: 
         <Breakdown totals={averageOf(now)} />
       </section>
 
-      <MetricTrends entries={entries} today={today} />
-
       <Calendar history={history} today={today} />
 
       <Streaks entries={entries} history={history} today={today} />
+
+      <MetricTrends entries={entries} today={today} />
     </>
   );
 }

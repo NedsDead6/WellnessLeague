@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allTime, formatMetric, trendSeries } from "./trends";
+import { allTime, formatMetric, rangeTitle, tickText, trendSeries } from "./trends";
 import { EMPTY_DAY, type DayEntry } from "./scoring";
 
 const day = (patch: Partial<DayEntry>): DayEntry => ({ ...EMPTY_DAY, ...patch });
@@ -55,5 +55,22 @@ describe("trends", () => {
     expect(formatMetric("steps", 12400)).toBe("12,400");
     expect(formatMetric("sleep", 7.5)).toBe("7.5 hrs");
     expect(formatMetric("work", 1)).toBe("1 hr");
+  });
+
+  it("labels the chart's value axis with units", () => {
+    expect(tickText("sleep", 4)).toBe("4h");
+    expect(tickText("work", 7.5)).toBe("7.5h");
+    expect(tickText("exercise", 30)).toBe("30m");
+    expect(tickText("exercise", 120)).toBe("2h");
+    expect(tickText("steps", 12500)).toBe("12.5k");
+    expect(tickText("sleep", 0)).toBe("0");
+  });
+
+  it("titles the visible range by month or year", () => {
+    expect(rangeTitle("day", "2026-10-05", "2026-10-21")).toBe("October 2026");
+    expect(rangeTitle("day", "2026-09-28", "2026-10-11")).toBe("Sep - Oct 2026");
+    expect(rangeTitle("week", "2025-12-15", "2026-02-02")).toBe("Dec 2025 - Feb 2026");
+    expect(rangeTitle("month", "2025-03-01", "2026-02-01")).toBe("2025 - 2026");
+    expect(rangeTitle("year", "2022-01-01", "2026-01-01")).toBe("");
   });
 });

@@ -184,30 +184,77 @@ button:focus-visible {
 }
 
 .group-head {
+  position: sticky;
+  top: 0;
+  z-index: 6;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 22px 4px 8px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  gap: 12px;
+  margin: 28px -16px 10px;
+  padding: 12px 20px;
+  background: rgba(10, 18, 38, 0.94);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--ink);
 }
 
 .group-head .name {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* A color bar before every section title, so sections read as distinct blocks. */
+.group-head .name::before {
+  content: "";
+  flex: none;
+  width: 5px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--deep);
+}
+
+.group-head .name:has(.dot)::before {
+  display: none;
 }
 
 .group-head .dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  flex: none;
+  width: 5px;
+  height: 22px;
+  border-radius: 3px;
+}
+
+/* Smaller, non-sticky headings for sub-sections and the league title. */
+.group-head.sub,
+.group-head.plain {
+  position: static;
+  margin: 22px 4px 8px;
+  padding: 0;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom: 0;
+}
+
+.group-head.sub {
+  font-size: 16px;
 }
 
 .group-head .sum {
+  flex: none;
   color: var(--muted);
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
   font-variant-numeric: tabular-nums;
@@ -1740,10 +1787,6 @@ button:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.group-head.sub {
-  margin-top: 8px;
-}
-
 /* Matchup: two-column scoreboard like a fantasy app */
 .duel-board {
   display: grid;
@@ -2111,4 +2154,65 @@ button:focus-visible {
 
 .feed-reacts {
   margin-top: 2px;
+}
+
+
+/* Scrollable trend chart */
+.trend {
+  margin-top: 12px;
+}
+
+.trend-month {
+  text-align: center;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.trend-body {
+  position: relative;
+  display: flex;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.trend-axis {
+  flex: none;
+  display: block;
+  border-right: 1px solid var(--line);
+  background: var(--card);
+}
+
+.trend-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.trend-scroll:focus-visible {
+  outline: 2px solid var(--deep);
+  outline-offset: -2px;
+}
+
+.trend-svg {
+  display: block;
+}
+
+.trend-tip {
+  top: 6px;
+  min-width: 190px;
+}
+
+.trend-hint {
+  margin: 8px 4px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
 }

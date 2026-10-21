@@ -198,7 +198,7 @@ function LeagueView({
 
   return (
     <section aria-label={`${league.name}`}>
-      <div className="group-head">
+      <div className="group-head plain">
         <span className="name">{showName ? league.name : "League"}</span>
         <button className="text-button" type="button" onClick={() => void data.reload()}>
           Refresh

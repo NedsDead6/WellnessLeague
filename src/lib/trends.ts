@@ -58,3 +58,28 @@ export function formatMetric(metric: MetricId, value: number): string {
   if (metric === "exercise") return value < 60 ? `${Math.round(value)} min` : hrs(value / 60);
   return hrs(value);
 }
+
+export const WEEKDAY_LETTERS = ["M", "T", "W", "Th", "F", "S", "S"];
+
+/** Short value labels for the chart's left edge: "8h", "45m", "12k". */
+export function tickText(metric: MetricId, v: number): string {
+  if (v === 0) return "0";
+  if (metric === "steps") return v >= 1000 ? `${Number((v / 1000).toFixed(1))}k` : String(Math.round(v));
+  if (metric === "exercise") return v < 60 ? `${Math.round(v)}m` : `${Number((v / 60).toFixed(1))}h`;
+  return `${Number(v.toFixed(1))}h`;
+}
+
+/**
+ * The heading above the chart for what is on screen: "October 2026", "Sep - Oct 2026",
+ * "2026" for months, nothing for years. `first` and `last` are the first and last visible period starts.
+ */
+export function rangeTitle(period: Period, first: string, last: string): string {
+  const month = (key: string) => new Date(`${key}T00:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "short" });
+  const longMonth = (key: string) => new Date(`${key}T00:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "long" });
+  const yearOf = (key: string) => key.slice(0, 4);
+  if (period === "year") return "";
+  if (period === "month") return yearOf(first) === yearOf(last) ? yearOf(first) : `${yearOf(first)} - ${yearOf(last)}`;
+  if (first.slice(0, 7) === last.slice(0, 7)) return `${longMonth(first)} ${yearOf(first)}`;
+  if (yearOf(first) === yearOf(last)) return `${month(first)} - ${month(last)} ${yearOf(first)}`;
+  return `${month(first)} ${yearOf(first)} - ${month(last)} ${yearOf(last)}`;
+}
