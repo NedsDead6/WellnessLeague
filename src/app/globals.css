@@ -1996,3 +1996,25 @@ button:focus-visible {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+.duel-board.solo {
+  grid-template-columns: 1fr;
+}
+
+.score-row.bye {
+  cursor: pointer;
+}
+
+.score-row.bye .score-sep strong {
+  margin-left: 6px;
+  font-size: 16px;
+}
+
+.duel-notes.solo-notes {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  gap: 4px;
+  font-size: 13px;
+}

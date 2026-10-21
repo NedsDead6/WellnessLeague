@@ -207,10 +207,12 @@ export function StandingsSection({
                 <span className={`score-name right ${!aLead && !tie ? "lead" : ""}`}>{m.b.name}</span>
               </button>
             ) : (
-              <div className="score-row bye" key={m.a.id}>
-                <span className="score-name">{m.a.name}</span>
-                <span className="score-sep wide">rest week</span>
-              </div>
+              <button className="score-row bye" key={m.a.id} onClick={() => onOpenMatchup(m.a.id)} aria-label={`Open ${m.a.name}, rest week`}>
+                <span className="score-name lead">{m.a.name}</span>
+                <span className="score-sep wide">
+                  rest week <strong className="lead">{fmt(round1(m.aPoints))}</strong>
+                </span>
+              </button>
             );
           })
         )}
@@ -413,7 +415,67 @@ export function MatchupsSection({ members, reactions, today, weekStart, mode, on
       )}
 
       {!right || !rt ? (
-        <p className="callout">{left.name} has a rest week. Matchups rotate, so everyone plays everyone.</p>
+        <>
+          <p className="callout">{left.name} has a rest week. Their points still count toward the season, and everyone can see them here.</p>
+          <div className="duel-board solo" aria-label="Scoreboard">
+            <div className="duel-side">
+              <span className="avatar">{left.name.charAt(0).toUpperCase()}</span>
+              <span className="duel-name">{left.name}</span>
+              <span className="duel-rec">Record {recordText(left.id)}</span>
+              <strong className="duel-score">{fmt(round1(lt.total))}</strong>
+              <span className="duel-days">
+                {lt.shared} {lt.shared === 1 ? "day" : "days"} shared
+              </span>
+              {mode === "day" && <ReactionBar targetId={left.id} name={left.name} day={day} reactions={reactions} userId={userId} onReact={onReact} />}
+            </div>
+          </div>
+          <StackedChart
+            bars={[
+              {
+                key: left.id,
+                label: left.name.split(" ")[0].slice(0, 9),
+                title: left.name,
+                sub: mode === "day" ? dayLong(day) : `${periodLabel(weekStart, "week")}, ${lt.shared} ${lt.shared === 1 ? "day" : "days"} shared`,
+                segments: segmentsOf(lt),
+                hasData: lt.shared > 0,
+                marked: left.you,
+              },
+            ]}
+            emptyText="Nothing shared"
+            ariaLabel={`${left.name}, points by category`}
+          />
+          <section aria-label="Breakdown" className="duel-table solo-table">
+            {CATEGORIES.filter((c) => Math.abs(lt.categories[c.key]) > 0.0005).map((c) => (
+              <div className="duel-row" key={c.key}>
+                <span className="win">{sign(lt.categories[c.key])}</span>
+                <span>{SHORT[c.key]}</span>
+                <span />
+              </div>
+            ))}
+            <div className="duel-row">
+              <span className="win">{dl.steps.toLocaleString("en-US")}</span>
+              <span>Steps</span>
+              <span />
+            </div>
+            <div className="duel-row">
+              <span className="win">{dl.minutes} min</span>
+              <span>Exercise</span>
+              <span />
+            </div>
+            {dl.notes.length > 0 && (
+              <ul className="duel-notes solo-notes" aria-label="What they did for exercise">
+                {dl.notes.map((n, k) => (
+                  <li key={k}>{n}</li>
+                ))}
+              </ul>
+            )}
+            <div className="duel-row total">
+              <span className="win">{fmt(round1(lt.total))}</span>
+              <span>Total</span>
+              <span />
+            </div>
+          </section>
+        </>
       ) : (
         <>
           <div className="duel-board" aria-label="Scoreboard">

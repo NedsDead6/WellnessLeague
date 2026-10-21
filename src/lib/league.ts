@@ -131,7 +131,11 @@ export function matchupRecords(members: ScoredMember[], before: string): Record<
   if (start === null) return records;
   for (const week of weeksFrom(start, addDays(before, -7))) {
     for (const m of weekMatchups(members, week)) {
-      if (!m.b) continue;
+      // A rest week is no win or loss, but the points still count for the season.
+      if (!m.b) {
+        records[m.a.id].pointsFor += m.aPoints;
+        continue;
+      }
       // A week where neither person shared anything isn't a result.
       if (totalsFor(m.a, weekDays(week)).shared + totalsFor(m.b, weekDays(week)).shared === 0) continue;
       records[m.a.id].pointsFor += m.aPoints;

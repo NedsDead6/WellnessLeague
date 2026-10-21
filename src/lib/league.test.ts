@@ -213,3 +213,21 @@ describe("feed times", () => {
     expect(items.find((i) => i.text.startsWith("B"))?.exact).toBe(false);
   });
 });
+
+describe("rest weeks", () => {
+  it("counts rest-week points toward the season without a win or loss", () => {
+    const members = scored([
+      member("a", { "2026-10-12": { steps: 8000 }, "2026-10-19": { steps: 8000 } }, true),
+      member("b", { "2026-10-12": { steps: 4000 }, "2026-10-19": { steps: 4000 } }),
+      member("c", { "2026-10-12": { steps: 12000 }, "2026-10-19": { steps: 12000 } }),
+    ]);
+    const records = matchupRecords(members, "2026-10-26");
+    const decisions = Object.values(records).reduce((n, r) => n + r.wins + r.losses + r.ties, 0);
+    expect(decisions).toBe(4); // one real match per week, two players each
+    // Everyone's points for the season include the week they rested.
+    for (const m of members) {
+      const both = totalsFor(m, [...weekDays("2026-10-12"), ...weekDays("2026-10-19")]).total;
+      expect(records[m.id].pointsFor).toBeCloseTo(both, 1);
+    }
+  });
+});
