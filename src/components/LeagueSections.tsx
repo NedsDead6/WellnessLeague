@@ -8,6 +8,8 @@ import {
   challengeProgress,
   challengeTitle,
   formatWhen,
+  AWARD_KEYS,
+  awardCounts,
   matchupRecords,
   metricInfo,
   seasonStats,
@@ -126,6 +128,7 @@ export function StandingsSection({
 }) {
   const currentWeek = weekOf(today);
   const records = matchupRecords(members, currentWeek);
+  const counts = awardCounts(members, currentWeek);
   const table = [...members].sort(
     (a, b) =>
       records[b.id].wins - records[a.id].wins ||
@@ -137,6 +140,20 @@ export function StandingsSection({
   const matchups = weekMatchups(members, weekStart).sort((x, y) => Number(y.a.you || !!y.b?.you) - Number(x.a.you || !!x.b?.you));
   const stats = seasonStats(members);
   const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? "Someone";
+
+  const weekDaysList = weekDays(weekStart);
+  const weekBars: ChartBar[] = members
+    .map((m) => ({ m, t: totalsFor(m, weekDaysList) }))
+    .sort((a, b) => b.t.total - a.t.total)
+    .map(({ m, t }) => ({
+      key: m.id,
+      label: m.you ? "You" : m.name.split(" ")[0].slice(0, 7),
+      title: m.name,
+      sub: `${periodLabel(weekStart, "week")}: ${t.shared} ${t.shared === 1 ? "day" : "days"} shared`,
+      segments: segmentsOf(t),
+      hasData: t.shared > 0,
+      marked: m.you,
+    }));
 
   const seasonDays = Array.from(new Set(members.flatMap((m) => Object.keys(m.scores)))).sort();
   const seasonRows = members
@@ -189,38 +206,61 @@ export function StandingsSection({
           <span className="name">League table</span>
           <span className="sum">completed weeks</span>
         </div>
-        <div className="table">
-          <div className="table-row head">
-            <span />
-            <span>Team</span>
-            <span>W-L</span>
-            <span>PF</span>
-            <span>PA</span>
+        <div className="table-scroll" tabIndex={0} role="region" aria-label="League table. Scroll sideways to see award counts.">
+          <div className="table">
+            <div className="table-row head">
+              <span />
+              <span>Team</span>
+              <span>W-L</span>
+              <span>PF</span>
+              <span>PA</span>
+              {AWARD_KEYS.map((a) => (
+                <span key={a.key} className="award-col" title={a.title} aria-label={a.title}>
+                  {awardIcon(a.key)}
+                </span>
+              ))}
+            </div>
+            {table.map((m, i) => {
+              const r = records[m.id];
+              return (
+                <div className={`table-row ${m.you ? "you" : ""}`} key={m.id}>
+                  <span className="rank">{i + 1}</span>
+                  <span className="table-name">
+                    <Avatar name={m.name} url={m.avatarUrl} size={24} />
+                    {m.name}
+                  </span>
+                  <span className="table-rec">
+                    {r.wins}-{r.losses}
+                    {r.ties > 0 ? `-${r.ties}` : ""}
+                  </span>
+                  <span>{fmt(round1(r.pointsFor))}</span>
+                  <span>{fmt(round1(r.pointsAgainst))}</span>
+                  {AWARD_KEYS.map((a) => {
+                    const n = counts[m.id]?.[a.key] ?? 0;
+                    return (
+                      <span key={a.key} className={`award-col ${n === 0 ? "zero" : ""}`} aria-label={`${a.title}: ${n}`}>
+                        {n}
+                      </span>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
-          {table.map((m, i) => {
-            const r = records[m.id];
-            return (
-              <div className={`table-row ${m.you ? "you" : ""}`} key={m.id}>
-                <span className="rank">{i + 1}</span>
-                <span className="table-name">
-                  <Avatar name={m.name} url={m.avatarUrl} size={24} />
-                  {m.name}
-                </span>
-                <span className="table-rec">
-                  {r.wins}-{r.losses}
-                  {r.ties > 0 ? `-${r.ties}` : ""}
-                </span>
-                <span>{fmt(round1(r.pointsFor))}</span>
-                <span>{fmt(round1(r.pointsAgainst))}</span>
-              </div>
-            );
-          })}
         </div>
         <p className="demo-note">
           {played
-            ? "Ranked by wins, then points for (PF). PA is points against."
-            : "Records start once the first full week has been played. PF is points for, PA is points against."}
+            ? "Ranked by wins, then points for (PF). PA is points against. Scroll right for award counts."
+            : "Records start once the first full week has been played. PF is points for, PA is points against. Scroll right for award counts."}
         </p>
+      </section>
+
+      <section aria-label="Weekly points by member">
+        <div className="group-head">
+          <span className="name">Weekly points by member</span>
+          <span className="sum">{periodLabel(weekStart, "week")}</span>
+        </div>
+        <StackedChart bars={weekBars} emptyText="Nothing shared" ariaLabel="Weekly points by member, split by category" />
       </section>
 
       <section aria-label="Season points by member">
@@ -262,7 +302,7 @@ function SeasonCard({ label, who, detail }: { label: string; who: string | null 
 // ---------------------------------------------------------------- Weekly awards
 
 const AWARD_STYLE: Record<string, { emoji: string; color: string }> = {
-  mvp: { emoji: "", color: "#ffd23d" },
+  mvp: { emoji: "⭐", color: "#ffc61a" },
   improved: { emoji: "📈", color: "#5ee0ff" },
   balanced: { emoji: "⚖️", color: "#e6eeff" },
   physical: { emoji: "💪", color: GROUP_COLORS.physical },
@@ -275,6 +315,9 @@ const AWARD_STYLE: Record<string, { emoji: string; color: string }> = {
   eater: { emoji: "🥗", color: GROUP_COLORS.physical },
   social: { emoji: "🦋", color: GROUP_COLORS.mental },
 };
+
+/** The small picture that heads an award's column in the league table. */
+const awardIcon = (key: string) => AWARD_STYLE[key]?.emoji ?? "";
 
 export function AwardsSection({ members, weekStart }: { members: ScoredMember[]; weekStart: string }) {
   const awards = weeklyAwards(members, weekStart);
@@ -292,12 +335,12 @@ export function AwardsSection({ members, weekStart }: { members: ScoredMember[];
             const style = AWARD_STYLE[a.key] ?? { emoji: "", color: "#ffd23d" };
             return (
               <div className="award" key={a.key}>
-                <span className="award-title" style={{ color: style.color }}>
+                <span className={`award-title ${a.key === "mvp" ? "mvp" : ""}`} style={a.key === "mvp" ? undefined : { color: style.color }}>
                   {a.title}
                   {a.key === "mvp" ? (
-                    <svg className="award-star" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
-                      <path fill="currentColor" d="M12 2.5l2.95 6.1 6.65.9-4.85 4.65 1.2 6.6L12 17.5l-5.95 3.25 1.2-6.6L2.4 9.5l6.65-.9z" />
-                    </svg>
+                    <span className="award-star" aria-hidden="true">
+                      ⭐
+                    </span>
                   ) : (
                     style.emoji && (
                       <span className="award-emoji" aria-hidden="true">

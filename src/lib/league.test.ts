@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  awardCounts,
   challengeProgress,
   feedItems,
   formatWhen,
@@ -95,7 +96,8 @@ describe("weekly awards", () => {
 
   it("names the most balanced and a king per pillar", () => {
     expect(byKey.balanced.memberId).toBe("b"); // only b has points in all three pillars
-    expect(byKey.physical.memberId).toBe("b");
+    expect(byKey.physical.memberId).toBe("c"); // physical king counts exercise time, and only c exercised
+    expect(byKey.physical.detail).toContain("exercised");
     expect(byKey.mental.memberId).toBe("a");
     expect(byKey.spiritual.memberId).toBe("b");
   });
@@ -259,5 +261,22 @@ describe("more weekly awards", () => {
     expect(toDisplay("exerciseMin", 600)).toBe(10);
     expect(toStored("readingMin", 2.5)).toBe(150);
     expect(toDisplay("steps", 1000)).toBe(1000);
+  });
+});
+
+describe("award counts", () => {
+  const members = scored([
+    member("a", { [W1]: { steps: 8000 }, [W2]: { steps: 12000 } }),
+    member("b", { [W1]: { steps: 4000 }, [W2]: { steps: 40000 } }),
+  ]);
+
+  it("only counts weeks that have ended", () => {
+    const before = awardCounts(members, W2); // week of W2 is still going
+    expect(before.a.mvp).toBe(1);
+    expect(before.b?.mvp).toBeUndefined();
+    const after = awardCounts(members, "2026-10-26");
+    expect(after.a.mvp).toBe(1);
+    expect(after.b.mvp).toBe(1);
+    expect(after.b.steps).toBe(1);
   });
 });

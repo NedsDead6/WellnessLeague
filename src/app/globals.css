@@ -1664,35 +1664,91 @@ button:focus-visible {
 }
 
 /* Standings table, score rows, season stats */
-.table {
+.table-scroll {
   border-radius: 14px;
   border: 1px solid var(--line);
   background: var(--card);
-  overflow: hidden;
+  overflow-x: auto;
   margin-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.table-scroll:focus-visible {
+  outline: 2px solid var(--deep);
+  outline-offset: -2px;
+}
+
+.table {
+  width: max-content;
+  min-width: 100%;
 }
 
 .table-row {
   display: grid;
-  grid-template-columns: 28px 1fr 56px 52px 52px;
+  grid-template-columns: 40px 136px 56px 52px 52px repeat(12, 46px);
   align-items: center;
-  gap: 4px;
-  padding: 11px 12px;
+  padding: 11px 0;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
   border-top: 1px solid var(--line);
+  background: var(--card);
 }
 
 .table-row:first-child {
   border-top: 0;
 }
 
+.table-row > span {
+  padding: 0 4px;
+}
+
 .table-row > span:nth-child(n + 3) {
   text-align: right;
 }
 
+.table-row > span:nth-child(n + 6) {
+  text-align: center;
+}
+
+/* Rank and team stay in view while the award columns scroll. */
+.table-row > span:nth-child(1),
+.table-row > span:nth-child(2) {
+  position: sticky;
+  z-index: 1;
+  background: inherit;
+}
+
+.table-row > span:nth-child(1) {
+  left: 0;
+  padding-left: 12px;
+}
+
+.table-row > span:nth-child(2) {
+  left: 40px;
+}
+
+.table-row > span:nth-child(5) {
+  padding-right: 10px;
+}
+
+.award-col {
+  font-size: 14px;
+}
+
+.award-col.zero {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.table-row.head .award-col {
+  font-size: 16px;
+  opacity: 1;
+}
+
 .table-row.head {
-  padding: 8px 12px;
+  padding: 8px 0;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -1702,7 +1758,7 @@ button:focus-visible {
 }
 
 .table-row.you {
-  background: var(--physical-tint);
+  background: #163c43;
 }
 
 .table-name {
@@ -2266,4 +2322,25 @@ button:focus-visible {
 .trend + .stat-grid,
 .trend ~ .stat-grid {
   margin-top: 12px;
+}
+
+
+/* MVP: gold lettering and a glossy star */
+.award-title.mvp {
+  background: linear-gradient(180deg, #ffe680 0%, #ffc61a 55%, #e09a00 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  font-size: 17px;
+  letter-spacing: 0.04em;
+}
+
+.award-title.mvp .award-star {
+  -webkit-text-fill-color: initial;
+  font-size: 22px;
+  line-height: 1;
+  vertical-align: -3px;
+  margin-left: 6px;
+  filter: drop-shadow(0 0 6px rgba(255, 198, 26, 0.7)) saturate(1.25);
 }

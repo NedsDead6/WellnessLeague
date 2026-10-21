@@ -221,8 +221,13 @@ export function weeklyAwards(members: ScoredMember[], weekStart: string): Award[
       detail: `${balanced.balancedDays} ${balanced.balancedDays === 1 ? "day" : "days"} with all three pillars`,
     });
 
+  const hours = (n: number) => `${round1(n)} ${round1(n) === 1 ? "hr" : "hrs"}`;
+
+  // Physical king is about time spent exercising, not points.
+  const physicalKing = best(rows.filter((r) => r.exercise > 0), (r) => r.exercise);
+  if (physicalKing) awards.push({ key: "physical", title: "Physical king", memberId: physicalKing.m.id, detail: `${hours(physicalKing.exercise / 60)} exercised` });
+
   for (const [key, title] of [
-    ["physical", "Physical king"],
     ["mental", "Mental king"],
     ["spiritual", "Spiritual king"],
   ] as const) {
@@ -230,7 +235,6 @@ export function weeklyAwards(members: ScoredMember[], weekStart: string): Award[
     if (king) awards.push({ key, title, memberId: king.m.id, detail: pts(king.now[key]) });
   }
 
-  const hours = (n: number) => `${round1(n)} ${round1(n) === 1 ? "hr" : "hrs"}`;
   const grinder = best(rows.filter((r) => r.work > 0), (r) => r.work);
   if (grinder) awards.push({ key: "grinder", title: "The Grinder", memberId: grinder.m.id, detail: `${hours(grinder.work)} worked` });
 
@@ -256,6 +260,39 @@ export function weeklyAwards(members: ScoredMember[], weekStart: string): Award[
   const butterfly = best(rows.filter((r) => r.social > 0), (r) => r.social);
   if (butterfly) awards.push({ key: "social", title: "Social Butterfly", memberId: butterfly.m.id, detail: `${hours(butterfly.social)} with people` });
   return awards;
+}
+
+/** Every award, in the order they appear in the league table. */
+export const AWARD_KEYS: { key: string; title: string }[] = [
+  { key: "mvp", title: "MVP" },
+  { key: "improved", title: "Most improved" },
+  { key: "balanced", title: "Most balanced" },
+  { key: "physical", title: "Physical king" },
+  { key: "mental", title: "Mental king" },
+  { key: "spiritual", title: "Spiritual king" },
+  { key: "grinder", title: "The Grinder" },
+  { key: "steps", title: "Mileage Machine" },
+  { key: "exercise", title: "Sweat Equity" },
+  { key: "clean", title: "Halo Award" },
+  { key: "eater", title: "Golden Fork" },
+  { key: "social", title: "Social Butterfly" },
+];
+
+/**
+ * How many of each award every member has won over the completed weeks before `before`.
+ * A week's awards are settled once it ends.
+ */
+export function awardCounts(members: ScoredMember[], before: string): Record<string, Record<string, number>> {
+  const counts: Record<string, Record<string, number>> = Object.fromEntries(members.map((m) => [m.id, {}]));
+  const start = firstWeek(members);
+  if (start === null) return counts;
+  for (const week of weeksFrom(start, addDays(before, -7))) {
+    for (const a of weeklyAwards(members, week)) {
+      const mine = counts[a.memberId];
+      if (mine) mine[a.key] = (mine[a.key] ?? 0) + 1;
+    }
+  }
+  return counts;
 }
 
 /** Who leads each pillar over some days. */
