@@ -223,10 +223,6 @@ export function weeklyAwards(members: ScoredMember[], weekStart: string): Award[
 
   const hours = (n: number) => `${round1(n)} ${round1(n) === 1 ? "hr" : "hrs"}`;
 
-  // Physical king is about time spent exercising, not points.
-  const physicalKing = best(rows.filter((r) => r.exercise > 0), (r) => r.exercise);
-  if (physicalKing) awards.push({ key: "physical", title: "Physical king", memberId: physicalKing.m.id, detail: `${hours(physicalKing.exercise / 60)} exercised` });
-
   for (const [key, title] of [
     ["mental", "Mental king"],
     ["spiritual", "Spiritual king"],
@@ -267,7 +263,6 @@ export const AWARD_KEYS: { key: string; title: string }[] = [
   { key: "mvp", title: "MVP" },
   { key: "improved", title: "Most improved" },
   { key: "balanced", title: "Most balanced" },
-  { key: "physical", title: "Physical king" },
   { key: "mental", title: "Mental king" },
   { key: "spiritual", title: "Spiritual king" },
   { key: "grinder", title: "The Grinder" },

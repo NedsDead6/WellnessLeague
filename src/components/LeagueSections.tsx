@@ -215,8 +215,8 @@ export function StandingsSection({
               <span>PF</span>
               <span>PA</span>
               {AWARD_KEYS.map((a) => (
-                <span key={a.key} className="award-col" title={a.title} aria-label={a.title}>
-                  {awardIcon(a.key)}
+                <span key={a.key} className="award-col" title={a.title}>
+                  {a.title} {awardIcon(a.key)}
                 </span>
               ))}
             </div>
@@ -305,7 +305,6 @@ const AWARD_STYLE: Record<string, { emoji: string; color: string }> = {
   mvp: { emoji: "⭐", color: "#ffc61a" },
   improved: { emoji: "📈", color: "#5ee0ff" },
   balanced: { emoji: "⚖️", color: "#e6eeff" },
-  physical: { emoji: "💪", color: GROUP_COLORS.physical },
   mental: { emoji: "🧠", color: GROUP_COLORS.mental },
   spiritual: { emoji: "🙏", color: GROUP_COLORS.spiritual },
   grinder: { emoji: "💼", color: GROUP_COLORS.mental },

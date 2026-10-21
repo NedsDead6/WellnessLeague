@@ -45,6 +45,7 @@ export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared
   const userId = session?.user.id;
   const [chosen, setChosen] = useState<string | null>(() => (typeof window === "undefined" ? null : rememberedLeague()));
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [section, setSection] = useState<Section>("standings");
 
   const selected = leagues.find((l) => l.id === chosen) ?? leagues[0];
 
@@ -63,6 +64,23 @@ export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared
 
   return (
     <>
+      {selected && (
+        <div className="seg sections top" role="group" aria-label="League sections">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.id}
+              aria-pressed={section === s.id && !settingsOpen}
+              onClick={() => {
+                setSection(s.id);
+                setSettingsOpen(false);
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {leagues.length === 0 && <p className="callout">You&apos;re not in a league yet. Create one below, or open an invite link from a friend.</p>}
 
       {leagues.length > 1 && (
@@ -106,6 +124,8 @@ export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared
           updatedAt={updatedAt}
           avatarUrl={avatarUrl}
           showName={leagues.length === 1}
+          section={section}
+          onSection={setSection}
           settingsOpen={settingsOpen && selected.owner_id === userId}
           onCloseSettings={() => setSettingsOpen(false)}
           onLeaguesChanged={onLeaguesChanged}
@@ -133,6 +153,8 @@ function LeagueView({
   updatedAt,
   avatarUrl,
   showName,
+  section,
+  onSection,
   settingsOpen,
   onCloseSettings,
   onLeaguesChanged,
@@ -145,6 +167,8 @@ function LeagueView({
   updatedAt: Record<string, string>;
   avatarUrl: string | null;
   showName: boolean;
+  section: Section;
+  onSection: (s: Section) => void;
   settingsOpen: boolean;
   onCloseSettings: () => void;
   onLeaguesChanged: () => void | Promise<void>;
@@ -152,7 +176,6 @@ function LeagueView({
   const data = useLeagueData(league.id, userId);
   const rules = useMemo(() => normalizeRules(league.scoring), [league.scoring]);
 
-  const [section, setSection] = useState<Section>("standings");
   const [mode, setMode] = useState<Mode>("day");
   const [offset, setOffset] = useState(0);
   const [dayIdx, setDayIdx] = useState(() => weekdayIndex(today));
@@ -206,14 +229,6 @@ function LeagueView({
         </button>
       </div>
 
-      <div className="seg sections" role="group" aria-label="League sections">
-        {SECTIONS.map((s) => (
-          <button key={s.id} aria-pressed={section === s.id} onClick={() => setSection(s.id)}>
-            {s.label}
-          </button>
-        ))}
-      </div>
-
       {data.error && <p className="form-message">Couldn&apos;t load the league: {data.error}</p>}
 
       {usesWeek && (
@@ -234,7 +249,7 @@ function LeagueView({
           weekStart={weekStart}
           onOpenMatchup={(id) => {
             setPairId(id);
-            setSection("matchups");
+            onSection("matchups");
           }}
         />
       )}
@@ -261,7 +276,7 @@ function LeagueView({
   );
 }
 
-/** Invite friends and create a league, tucked into two compact toggles. */
+/** Small buttons for inviting, creating and (for owners) league settings; each expands in place. */
 function LeagueTools({
   league,
   userId,
@@ -282,18 +297,20 @@ function LeagueTools({
 
   return (
     <div className="tools">
-      <div className="seg tools-seg" role="group" aria-label="League tools">
-        <button aria-expanded={open === "invite"} disabled={!league} onClick={() => toggle("invite")}>
-          Invite friends
-        </button>
-        <button aria-expanded={open === "create"} onClick={() => toggle("create")}>
-          New league
-        </button>
-        {isOwner && (
-          <button aria-expanded={settingsOpen} onClick={onToggleSettings}>
-            Settings
+      <div className="mini-actions" role="group" aria-label="League tools">
+        {league && (
+          <button type="button" aria-expanded={open === "invite"} onClick={() => toggle("invite")}>
+            ＋ Invite
           </button>
         )}
+        {isOwner && (
+          <button type="button" aria-expanded={settingsOpen} onClick={onToggleSettings}>
+            ⚙ Settings
+          </button>
+        )}
+        <button type="button" aria-expanded={open === "create"} onClick={() => toggle("create")}>
+          ＋ New league
+        </button>
       </div>
       {open === "invite" && league && <InvitePanel league={league} />}
       {open === "create" && (

@@ -96,8 +96,8 @@ describe("weekly awards", () => {
 
   it("names the most balanced and a king per pillar", () => {
     expect(byKey.balanced.memberId).toBe("b"); // only b has points in all three pillars
-    expect(byKey.physical.memberId).toBe("c"); // physical king counts exercise time, and only c exercised
-    expect(byKey.physical.detail).toContain("exercised");
+    expect(byKey.physical).toBeUndefined(); // exercise time is Sweat Equity now
+    expect(byKey.exercise.memberId).toBe("c");
     expect(byKey.mental.memberId).toBe("a");
     expect(byKey.spiritual.memberId).toBe("b");
   });
