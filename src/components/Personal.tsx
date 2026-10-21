@@ -32,6 +32,7 @@ import {
 import { BONUS_COLOR, CATEGORY_COLORS, GROUP_COLORS } from "@/lib/colors";
 import { CATEGORIES, type CategoryKey, type ScoringRules } from "@/lib/scoring";
 import { fmt, fmtSigned } from "./DailyLog";
+import { MetricTrends } from "./MetricTrends";
 import { StackedChart, segmentsOf, type ChartBar } from "./StackedChart";
 
 const PERIODS: { id: Period; label: string; count: number; title: string }[] = [
@@ -133,6 +134,8 @@ export function Personal({ entries, today, rules }: { entries: EntryMap; today: 
         </div>
         <Breakdown totals={averageOf(now)} />
       </section>
+
+      <MetricTrends entries={entries} today={today} />
 
       <Calendar history={history} today={today} />
 
