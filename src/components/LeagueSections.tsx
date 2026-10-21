@@ -459,6 +459,7 @@ export function MatchupsSection({ members, reactions, today, weekStart, mode, on
   const rt = right ? totalsFor(right, picked) : null;
   const dl = detailsFor(left, picked);
   const dr = right ? detailsFor(right, picked) : dl;
+  const scoreLabel = mode === "week" ? "Week points" : day === today ? "Points today" : "Day points";
   const recordText = (id: string) => {
     const r = records[id];
     return `${r.wins}-${r.losses}${r.ties > 0 ? `-${r.ties}` : ""}`;
@@ -466,7 +467,22 @@ export function MatchupsSection({ members, reactions, today, weekStart, mode, on
 
   return (
     <>
-      <div className="seg" role="group" aria-label="Matchup view">
+      {matchups.length > 1 && (
+        <select
+          className="matchup-select"
+          aria-label="Choose a matchup"
+          value={sel.a.id}
+          onChange={(e) => onPair(e.target.value)}
+        >
+          {matchups.map((m) => (
+            <option key={m.a.id} value={m.a.id}>
+              {m.a.name} vs {m.b ? m.b.name : "rest week"}
+            </option>
+          ))}
+        </select>
+      )}
+
+      <div className="seg small" role="group" aria-label="Matchup view">
         <button aria-pressed={mode === "day"} onClick={() => onMode("day")}>
           Day
         </button>
@@ -497,24 +513,15 @@ export function MatchupsSection({ members, reactions, today, weekStart, mode, on
         </div>
       )}
 
-      {matchups.length > 1 && (
-        <div className="league-tabs" role="group" aria-label="Matchups this week">
-          {matchups.map((m) => (
-            <button key={m.a.id} aria-pressed={m.a.id === sel.a.id} onClick={() => onPair(m.a.id)}>
-              {first(m.a.name)} vs {m.b ? first(m.b.name) : "rest"}
-            </button>
-          ))}
-        </div>
-      )}
-
       {!right || !rt ? (
         <>
           <p className="callout">{left.name} has a rest week. Their points still count toward the season, and everyone can see them here.</p>
           <div className="duel-board solo" aria-label="Scoreboard">
             <div className="duel-side">
-              <Avatar name={left.name} url={left.avatarUrl} />
+              <Avatar name={left.name} url={left.avatarUrl} size={28} />
               <span className="duel-name">{left.name}</span>
               <span className="duel-rec">Record {recordText(left.id)}</span>
+              <span className="duel-label">{scoreLabel}</span>
               <strong className="duel-score">{fmt(round1(lt.total))}</strong>
               <span className="duel-days">
                 {lt.shared} {lt.shared === 1 ? "day" : "days"} shared
@@ -579,9 +586,10 @@ export function MatchupsSection({ members, reactions, today, weekStart, mode, on
               const other = i === 0 ? rt : lt;
               return (
                 <div className={`duel-side ${t.total > other.total ? "lead" : ""}`} key={m.id}>
-                  <Avatar name={m.name} url={m.avatarUrl} />
+                  <Avatar name={m.name} url={m.avatarUrl} size={28} />
                   <span className="duel-name">{m.name}</span>
                   <span className="duel-rec">Record {recordText(m.id)}</span>
+                  <span className="duel-label">{scoreLabel}</span>
                   <strong className="duel-score">{fmt(round1(t.total))}</strong>
                   <span className="duel-days">
                     {t.shared} {t.shared === 1 ? "day" : "days"} shared

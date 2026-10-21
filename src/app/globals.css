@@ -1687,7 +1687,7 @@ button:focus-visible {
 
 .table-row {
   display: grid;
-  grid-template-columns: 40px 136px 56px 52px 52px repeat(11, 132px);
+  grid-template-columns: 40px 136px 56px 52px 52px repeat(11, 128px);
   align-items: stretch;
   padding: 0;
   font-size: 14px;
@@ -1709,11 +1709,9 @@ button:focus-visible {
 }
 
 .table-row > span:nth-child(n + 3) {
-  text-align: right;
-}
-
-.table-row > span:nth-child(n + 6) {
+  text-align: center;
   justify-content: center;
+  border-left: 1px solid rgba(143, 161, 201, 0.16);
 }
 
 /* Rank and team stay in view while the award columns scroll. Solid fills hide whatever passes under. */
@@ -1740,9 +1738,6 @@ button:focus-visible {
   left: 40px;
 }
 
-.table-row > span:nth-child(5) {
-  padding-right: 10px;
-}
 
 .award-col {
   font-size: 14px;
@@ -1751,6 +1746,10 @@ button:focus-visible {
 .award-col.zero {
   color: var(--muted);
   opacity: 0.55;
+}
+
+.table-row.head > span:nth-child(n + 3) {
+  text-align: center;
 }
 
 .table-row.head .award-col {
@@ -2388,4 +2387,61 @@ button:focus-visible {
   background: var(--deep);
   border-color: var(--deep);
   color: #fff;
+}
+
+/* Matchups: compact controls and scoreboard */
+.matchup-select {
+  width: 100%;
+  min-height: 40px;
+  margin-bottom: 8px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--card-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.seg.small {
+  padding: 3px;
+  margin-bottom: 8px;
+  width: 180px;
+}
+
+.seg.small button {
+  height: 32px;
+  font-size: 13px;
+}
+
+.day-chip {
+  min-height: 48px;
+  gap: 0;
+}
+
+.day-chip strong {
+  font-size: 15px;
+}
+
+.day-chip .dow {
+  font-size: 10.5px;
+}
+
+.duel-side {
+  padding: 8px 6px;
+  gap: 2px;
+}
+
+.duel-score {
+  font-size: 26px;
+}
+
+.duel-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 2px;
 }
