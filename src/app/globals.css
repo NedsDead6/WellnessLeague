@@ -539,6 +539,7 @@ button:focus-visible {
 
 .nav {
   position: fixed;
+  z-index: 40;
   left: 0;
   right: 0;
   bottom: 0;
@@ -1680,52 +1681,62 @@ button:focus-visible {
   outline-offset: -2px;
 }
 
+/* One real grid: every cell is a direct grid item, so header and body lines always align. */
 .table {
+  display: grid;
+  grid-template-columns: 40px 136px 64px 64px 64px repeat(11, 132px);
   width: max-content;
   min-width: 100%;
 }
 
 .table-row {
-  display: grid;
-  grid-template-columns: 40px 136px 56px 52px 52px repeat(11, 128px);
-  align-items: stretch;
-  padding: 0;
+  display: contents;
+  --row-bg: #121c38;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
-  border-top: 1px solid var(--line);
-  --row-bg: #121c38;
-  background: var(--row-bg);
 }
 
-.table-row:first-child {
-  border-top: 0;
+.table-row.head {
+  --row-bg: #0d1630;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.table-row.you {
+  --row-bg: #163c43;
 }
 
 .table-row > span {
-  padding: 11px 4px;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 11px 6px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-}
-
-.table-row > span:nth-child(n + 3) {
-  text-align: center;
   justify-content: center;
-  border-left: 1px solid rgba(143, 161, 201, 0.16);
+  text-align: center;
+  background-color: var(--row-bg);
+  border-bottom: 1px solid var(--line);
+  border-left: 1px solid rgba(143, 161, 201, 0.18);
 }
 
-/* Rank and team stay in view while the award columns scroll. Solid fills hide whatever passes under. */
+.table-row.head > span {
+  padding-top: 9px;
+  padding-bottom: 9px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Rank and team stay in view while the other columns scroll. Solid fills hide whatever passes under. */
 .table-row > span:nth-child(1),
 .table-row > span:nth-child(2) {
   position: sticky;
   z-index: 2;
-  background-color: var(--row-bg);
   overflow: hidden;
   justify-content: flex-start;
-}
-
-.table-row > span:nth-child(2) {
-  box-shadow: 6px 0 8px -4px rgba(0, 0, 0, 0.55);
+  border-left: 0;
 }
 
 .table-row > span:nth-child(1) {
@@ -1736,8 +1747,8 @@ button:focus-visible {
 
 .table-row > span:nth-child(2) {
   left: 40px;
+  box-shadow: 6px 0 8px -4px rgba(0, 0, 0, 0.55);
 }
-
 
 .award-col {
   font-size: 14px;
@@ -1748,32 +1759,9 @@ button:focus-visible {
   opacity: 0.55;
 }
 
-.table-row.head > span:nth-child(n + 3) {
-  text-align: center;
-}
-
 .table-row.head .award-col {
   font-size: 11px;
   opacity: 1;
-  white-space: nowrap;
-}
-
-.table-row.head > span {
-  padding-top: 8px;
-  padding-bottom: 8px;
-}
-
-.table-row.head {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-  --row-bg: #0d1630;
-}
-
-.table-row.you {
-  --row-bg: #163c43;
 }
 
 .table-name {

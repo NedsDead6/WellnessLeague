@@ -164,6 +164,13 @@ export function DailyLog({
 
   return (
     <>
+      <Destination
+        leagues={leagues}
+        selected={selectedLeagueIds}
+        onChange={onLeaguesChange}
+        note={leagueNote}
+      />
+
       <DayPicker today={today} selected={day} entries={entries} onPick={onPickDay} />
 
       <div className="save-row">
@@ -172,13 +179,6 @@ export function DailyLog({
         </div>
         <ClearDay key={day} day={day} disabled={!isLogged(entry)} onClear={() => onChange(EMPTY_DAY)} />
       </div>
-
-      <Destination
-        leagues={leagues}
-        selected={selectedLeagueIds}
-        onChange={onLeaguesChange}
-        note={leagueNote}
-      />
 
       <div className="scoring-line">
         <span>{customized ? "Using your custom scoring" : "Using standard scoring"}</span>
