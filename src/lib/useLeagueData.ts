@@ -41,7 +41,7 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
     const client = supabase;
     setLoaded(false);
     try {
-      let roster = await client
+      let roster: { data: any[] | null; error: { message: string } | null } = await client
         .from("league_members")
         .select("user_id, joined_at, profiles(display_name, avatar_url)")
         .eq("league_id", leagueId);
@@ -111,8 +111,8 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
 
       setOthers(others.map((m) => ({ ...m, entries: byUser.get(m.id) ?? {}, updatedAt: stamps.get(m.id) ?? {} })));
       setReactions(reactionRows as Reaction[]);
-      setPosts(postRows.error ? [] : ((postRows.data ?? []) as Post[]));
-      setFeedReactions(feedReactionRows.error ? [] : ((feedReactionRows.data ?? []) as FeedReaction[]));
+      setPosts(postRows.error ? [] : ((postRows.data ?? []) as unknown as Post[]));
+      setFeedReactions(feedReactionRows.error ? [] : ((feedReactionRows.data ?? []) as unknown as FeedReaction[]));
       setChallenges(((challengeRows.data ?? []) as any[]).map((c) => ({ ...c, target: Number(c.target) })) as Challenge[]);
       setError(null);
     } catch (e) {
@@ -166,7 +166,7 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
         .select("id, league_id, user_id, body, created_at")
         .single();
       if (failed || !data) return failed?.message ?? "Couldn't post.";
-      setPosts((all) => [data as Post, ...all]);
+      setPosts((all) => [data as unknown as Post, ...all]);
       return null;
     },
     [leagueId, userId],
