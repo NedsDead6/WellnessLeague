@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchAll } from "./fetchAll";
 import { normalizeEntry } from "./history";
-import type { Challenge, Post, Reaction } from "./league";
+import type { Challenge, FeedReaction, Post, Reaction } from "./league";
 import type { DayEntry } from "./scoring";
 import { supabase } from "./supabase";
 
@@ -11,6 +11,7 @@ export interface OtherMember {
   id: string;
   name: string;
   joinedAt: string;
+  avatarUrl: string | null;
   /** Days this person shared with the league. */
   entries: Record<string, DayEntry>;
   /** When each shared day was last saved. */
@@ -27,6 +28,7 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [feedReactions, setFeedReactions] = useState<FeedReaction[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,10 +41,13 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
     const client = supabase;
     setLoaded(false);
     try {
-      const roster = await client
+      let roster = await client
         .from("league_members")
-        .select("user_id, joined_at, profiles(display_name)")
+        .select("user_id, joined_at, profiles(display_name, avatar_url)")
         .eq("league_id", leagueId);
+      // Before the photo migration is run the column is missing; load the roster without photos instead.
+      if (roster.error && /avatar_url/.test(roster.error.message))
+        roster = await client.from("league_members").select("user_id, joined_at, profiles(display_name)").eq("league_id", leagueId);
       if (roster.error) throw new Error(roster.error.message);
       const members = ((roster.data ?? []) as any[]).map((row) => {
         const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
@@ -50,6 +55,7 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
           id: row.user_id as string,
           name: (profile?.display_name as string | undefined) ?? "Member",
           joinedAt: (row.joined_at as string | undefined) ?? "",
+          avatarUrl: (profile?.avatar_url as string | null | undefined) ?? null,
         };
       });
       const others = members.filter((m) => m.id !== userId);
@@ -95,12 +101,18 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
         .eq("league_id", leagueId)
         .order("created_at", { ascending: false })
         .limit(200);
+      const feedReactionRows = await client
+        .from("league_feed_reactions")
+        .select("id, league_id, item_key, reactor_id, emoji")
+        .eq("league_id", leagueId)
+        .limit(2000);
       const challengeRows = await client.from("league_challenges").select("id, metric, target, week_start").eq("league_id", leagueId);
       if (challengeRows.error) throw new Error(challengeRows.error.message);
 
       setOthers(others.map((m) => ({ ...m, entries: byUser.get(m.id) ?? {}, updatedAt: stamps.get(m.id) ?? {} })));
       setReactions(reactionRows as Reaction[]);
       setPosts(postRows.error ? [] : ((postRows.data ?? []) as Post[]));
+      setFeedReactions(feedReactionRows.error ? [] : ((feedReactionRows.data ?? []) as FeedReaction[]));
       setChallenges(((challengeRows.data ?? []) as any[]).map((c) => ({ ...c, target: Number(c.target) })) as Challenge[]);
       setError(null);
     } catch (e) {
@@ -170,5 +182,32 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
     [],
   );
 
-  return { others, reactions, challenges, posts, loaded, error, reload: load, toggleReaction, addPost, deletePost };
+  /** Adds your emoji to a feed item, or takes it back if it's already there. Returns an error message or null. */
+  const toggleFeedReaction = useCallback(
+    async (itemKey: string, emoji: string): Promise<string | null> => {
+      if (!supabase || !leagueId || !userId) return null;
+      const mine = feedReactions.find((r) => r.reactor_id === userId && r.item_key === itemKey && r.emoji === emoji);
+      if (mine) {
+        setFeedReactions((all) => all.filter((r) => r !== mine));
+        const { error: failed } = await supabase.from("league_feed_reactions").delete().eq("id", mine.id);
+        return failed ? failed.message : null;
+      }
+      const fresh: FeedReaction = { league_id: leagueId, item_key: itemKey, reactor_id: userId, emoji };
+      setFeedReactions((all) => [...all, fresh]);
+      const { data, error: failed } = await supabase
+        .from("league_feed_reactions")
+        .insert({ league_id: leagueId, item_key: itemKey, reactor_id: userId, emoji })
+        .select("id")
+        .single();
+      if (failed) {
+        setFeedReactions((all) => all.filter((r) => r !== fresh));
+        return failed.message;
+      }
+      if (data) setFeedReactions((all) => all.map((r) => (r === fresh ? { ...r, id: data.id as string } : r)));
+      return null;
+    },
+    [leagueId, userId, feedReactions],
+  );
+
+  return { others, reactions, challenges, posts, feedReactions, toggleFeedReaction, loaded, error, reload: load, toggleReaction, addPost, deletePost };
 }

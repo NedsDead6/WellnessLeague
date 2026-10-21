@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { GROUP_COLORS } from "@/lib/colors";
+import { EMOJIS, QUICK_EMOJIS } from "@/lib/emojis";
 import { dayLong, dayOfMonth, dayShortWeekday, periodLabel } from "@/lib/dates";
 import {
   challengeProgress,
@@ -10,6 +11,7 @@ import {
   matchupRecords,
   metricInfo,
   seasonStats,
+  toDisplay,
   totalsFor,
   weekDays,
   weekMatchups,
@@ -17,17 +19,18 @@ import {
   weeklyAwards,
   type Challenge,
   type FeedItem,
+  type FeedReaction,
   type MemberTotals,
   type Reaction,
   type ScoredMember,
 } from "@/lib/league";
 import { CATEGORIES, type CategoryKey } from "@/lib/scoring";
+import { Avatar } from "./Avatar";
 import { fmt } from "./DailyLog";
 import { StackedChart, segmentsOf, type ChartBar } from "./StackedChart";
 
 export type Mode = "day" | "week";
 
-const EMOJIS = ["🔥", "👏", "💪", "🙌", "😮"];
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 function nameOf(members: ScoredMember[], id: string) {
@@ -170,7 +173,10 @@ export function StandingsSection({
             return (
               <div className={`table-row ${m.you ? "you" : ""}`} key={m.id}>
                 <span className="rank">{i + 1}</span>
-                <span className="table-name">{m.name}</span>
+                <span className="table-name">
+                  <Avatar name={m.name} url={m.avatarUrl} size={24} />
+                  {m.name}
+                </span>
                 <span className="table-rec">
                   {r.wins}-{r.losses}
                   {r.ties > 0 ? `-${r.ties}` : ""}
@@ -228,7 +234,14 @@ export function StandingsSection({
           <div className="awards">
             {awards.map((a) => (
               <div className="award" key={a.key}>
-                <span className="award-title">{a.title}</span>
+                <span className="award-title">
+                  {a.key === "mvp" && (
+                    <svg className="award-star" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                      <path fill="currentColor" d="M12 2.5l2.95 6.1 6.65.9-4.85 4.65 1.2 6.6L12 17.5l-5.95 3.25 1.2-6.6L2.4 9.5l6.65-.9z" />
+                    </svg>
+                  )}
+                  {a.title}
+                </span>
                 <strong>{nameOf(a.memberId)}</strong>
                 <span className="award-detail">{a.detail}</span>
               </div>
@@ -314,21 +327,23 @@ function ReactionBar({
           +
         </button>
       )}
-      {!mine &&
-        open &&
-        EMOJIS.map((emoji) => (
-          <button
-            key={emoji}
-            className="emoji-chip pick"
-            aria-label={`Send ${emoji} to ${name}`}
-            onClick={() => {
-              onReact(targetId, day, emoji);
-              setOpen(false);
-            }}
-          >
-            {emoji}
-          </button>
-        ))}
+      {!mine && open && (
+        <div className="emoji-grid" role="group" aria-label={`Pick an emoji for ${name}`}>
+          {EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              className="emoji-chip pick"
+              aria-label={`Send ${emoji} to ${name}`}
+              onClick={() => {
+                onReact(targetId, day, emoji);
+                setOpen(false);
+              }}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -419,7 +434,7 @@ export function MatchupsSection({ members, reactions, today, weekStart, mode, on
           <p className="callout">{left.name} has a rest week. Their points still count toward the season, and everyone can see them here.</p>
           <div className="duel-board solo" aria-label="Scoreboard">
             <div className="duel-side">
-              <span className="avatar">{left.name.charAt(0).toUpperCase()}</span>
+              <Avatar name={left.name} url={left.avatarUrl} />
               <span className="duel-name">{left.name}</span>
               <span className="duel-rec">Record {recordText(left.id)}</span>
               <strong className="duel-score">{fmt(round1(lt.total))}</strong>
@@ -486,7 +501,7 @@ export function MatchupsSection({ members, reactions, today, weekStart, mode, on
               const other = i === 0 ? rt : lt;
               return (
                 <div className={`duel-side ${t.total > other.total ? "lead" : ""}`} key={m.id}>
-                  <span className="avatar">{m.name.charAt(0).toUpperCase()}</span>
+                  <Avatar name={m.name} url={m.avatarUrl} />
                   <span className="duel-name">{m.name}</span>
                   <span className="duel-rec">Record {recordText(m.id)}</span>
                   <strong className="duel-score">{fmt(round1(t.total))}</strong>
@@ -610,14 +625,14 @@ export function GoalsSection({ challenges, members, weekStart }: { challenges: C
               <div style={{ width: `${Math.max(2, pct)}%` }} />
             </div>
             <div className="goal-count">
-              {Math.round(p.total).toLocaleString("en-US")} of {c.target.toLocaleString("en-US")} {unit}
+              {toDisplay(c.metric, p.total).toLocaleString("en-US")} of {toDisplay(c.metric, c.target).toLocaleString("en-US")} {unit}
             </div>
             {p.byMember.length > 0 && (
               <ul className="goal-members">
                 {p.byMember.map((r) => (
                   <li key={r.member.id}>
                     <span>{r.member.name}</span>
-                    <b>{Math.round(r.value).toLocaleString("en-US")}</b>
+                    <b>{toDisplay(c.metric, r.value).toLocaleString("en-US")}</b>
                   </li>
                 ))}
               </ul>
@@ -629,20 +644,83 @@ export function GoalsSection({ challenges, members, weekStart }: { challenges: C
   );
 }
 
-const POST_EMOJIS = ["🔥", "💪", "👏", "🙌", "🎉", "😂", "❤️", "🏃", "🧘", "😴", "🥗", "👟"];
+/** Emoji chips under a feed item, plus a button that opens the full emoji picker. */
+function FeedReactions({
+  itemKey,
+  reactions,
+  userId,
+  onReact,
+}: {
+  itemKey: string;
+  reactions: FeedReaction[];
+  userId: string;
+  onReact: (itemKey: string, emoji: string) => Promise<string | null>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const here = reactions.filter((r) => r.item_key === itemKey);
+  const grouped = EMOJIS.map((emoji) => ({
+    emoji,
+    count: here.filter((r) => r.emoji === emoji).length,
+    byYou: here.some((r) => r.emoji === emoji && r.reactor_id === userId),
+  })).filter((g) => g.count > 0);
+
+  const react = async (emoji: string) => {
+    const failed = await onReact(itemKey, emoji);
+    setProblem(failed ? (failed.includes("league_feed_reactions") ? "Reactions aren't set up yet. Run the latest SQL file in Supabase." : failed) : null);
+  };
+
+  return (
+    <div className="react-row feed-reacts">
+      {grouped.map((g) => (
+        <button key={g.emoji} className="emoji-chip" aria-pressed={g.byYou} aria-label={`${g.emoji} ${g.count}${g.byYou ? ", including you" : ""}`} onClick={() => void react(g.emoji)}>
+          {g.emoji} {g.count}
+        </button>
+      ))}
+      <button className="emoji-chip add" aria-expanded={open} aria-label="Add a reaction" onClick={() => setOpen(!open)}>
+        +
+      </button>
+      {open && (
+        <div className="emoji-grid" role="group" aria-label="Pick a reaction">
+          {EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              className="emoji-chip pick"
+              aria-label={`React with ${emoji}`}
+              onClick={() => {
+                void react(emoji);
+                setOpen(false);
+              }}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
+      {problem && <p className="form-message">{problem}</p>}
+    </div>
+  );
+}
 
 export function FeedSection({
   items,
+  reactions,
+  userId,
+  onReact,
   onPost,
   onDelete,
 }: {
   items: FeedItem[];
+  reactions: FeedReaction[];
+  userId: string;
+  onReact: (itemKey: string, emoji: string) => Promise<string | null>;
   onPost: (body: string) => Promise<string | null>;
   onDelete: (id: string) => void;
 }) {
   const [all, setAll] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [moreEmojis, setMoreEmojis] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const shown = all ? items : items.slice(0, 12);
   const now = new Date();
@@ -675,14 +753,18 @@ export function FeedSection({
           placeholder="Say something to the league..."
           onChange={(e) => setText(e.target.value)}
         />
+        <div className="emoji-strip" role="group" aria-label="Add an emoji">
+          {(moreEmojis ? EMOJIS : QUICK_EMOJIS).map((emoji) => (
+            <button key={emoji} type="button" className="emoji-chip pick" aria-label={`Add ${emoji}`} onClick={() => setText((t) => (t + emoji).slice(0, 280))}>
+              {emoji}
+            </button>
+          ))}
+          <button type="button" className="emoji-chip add" aria-expanded={moreEmojis} onClick={() => setMoreEmojis(!moreEmojis)}>
+            {moreEmojis ? "Less" : "More"}
+          </button>
+        </div>
         <div className="composer-bar">
-          <div className="emoji-strip" role="group" aria-label="Add an emoji">
-            {POST_EMOJIS.map((emoji) => (
-              <button key={emoji} type="button" className="emoji-chip pick" aria-label={`Add ${emoji}`} onClick={() => setText((t) => (t + emoji).slice(0, 280))}>
-                {emoji}
-              </button>
-            ))}
-          </div>
+          <span className="composer-count">{text.length}/280</span>
           <button className="primary" type="submit" disabled={busy || !text.trim()}>
             {busy ? "Posting..." : "Post"}
           </button>
@@ -703,7 +785,10 @@ export function FeedSection({
               {item.post ? (
                 <>
                   <span className="post-head">
-                    <strong>{item.post.name}</strong>
+                    <span className="post-who">
+                      <Avatar name={item.post.name} url={item.post.avatarUrl} size={28} />
+                      <strong>{item.post.name}</strong>
+                    </span>
                     {item.post.mine && (
                       <button type="button" className="text-button" aria-label="Delete your post" onClick={() => onDelete(item.post!.id)}>
                         Delete
@@ -720,6 +805,7 @@ export function FeedSection({
                   {formatWhen(item.at, now)}
                 </time>
               )}
+              <FeedReactions itemKey={item.key} reactions={reactions} userId={userId} onReact={onReact} />
             </li>
           ))}
         </ul>

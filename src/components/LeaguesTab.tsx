@@ -37,10 +37,11 @@ interface Props {
   entries: EntryMap;
   shared: Record<string, string[]>;
   updatedAt: Record<string, string>;
+  avatarUrl: string | null;
   today: string;
 }
 
-export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared, updatedAt, today }: Props) {
+export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared, updatedAt, avatarUrl, today }: Props) {
   const userId = session?.user.id;
   const [chosen, setChosen] = useState<string | null>(() => (typeof window === "undefined" ? null : rememberedLeague()));
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -103,6 +104,7 @@ export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared
           entries={entries}
           shared={shared}
           updatedAt={updatedAt}
+          avatarUrl={avatarUrl}
           showName={leagues.length === 1}
           settingsOpen={settingsOpen && selected.owner_id === userId}
           onCloseSettings={() => setSettingsOpen(false)}
@@ -128,6 +130,7 @@ function LeagueView({
   entries,
   shared,
   updatedAt,
+  avatarUrl,
   showName,
   settingsOpen,
   onCloseSettings,
@@ -139,6 +142,7 @@ function LeagueView({
   entries: EntryMap;
   shared: Record<string, string[]>;
   updatedAt: Record<string, string>;
+  avatarUrl: string | null;
   showName: boolean;
   settingsOpen: boolean;
   onCloseSettings: () => void;
@@ -159,12 +163,13 @@ function LeagueView({
       id: userId,
       name: "You",
       you: true,
+      avatarUrl,
       entries: Object.fromEntries(Object.entries(entries).filter(([day]) => (shared[day] ?? []).includes(league.id))),
       updatedAt: Object.fromEntries(Object.entries(updatedAt).filter(([day]) => (shared[day] ?? []).includes(league.id))),
     };
-    const others: LeagueMember[] = data.others.map((o) => ({ id: o.id, name: o.name, you: false, entries: o.entries, updatedAt: o.updatedAt }));
+    const others: LeagueMember[] = data.others.map((o) => ({ id: o.id, name: o.name, you: false, avatarUrl: o.avatarUrl, entries: o.entries, updatedAt: o.updatedAt }));
     return [...others, mine].map((m) => scoreMember(m, rules));
-  }, [data.others, entries, shared, updatedAt, league.id, userId, rules]);
+  }, [data.others, entries, shared, updatedAt, avatarUrl, league.id, userId, rules]);
 
   const currentWeek = weekOf(today);
   const weekStart = addDays(currentWeek, offset * 7);
@@ -249,7 +254,7 @@ function LeagueView({
         />
       )}
       {section === "goals" && <GoalsSection challenges={data.challenges} members={members} weekStart={weekStart} />}
-      {section === "feed" && <FeedSection items={feed} onPost={data.addPost} onDelete={(id) => void data.deletePost(id)} />}
+      {section === "feed" && <FeedSection items={feed} reactions={data.feedReactions} userId={userId} onReact={data.toggleFeedReaction} onPost={data.addPost} onDelete={(id) => void data.deletePost(id)} />}
     </section>
   );
 }

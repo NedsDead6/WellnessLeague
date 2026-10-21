@@ -11,6 +11,7 @@ import { dayKey, periodLabel } from "@/lib/dates";
 import { currentStreak, streakAt } from "@/lib/history";
 import { EMPTY_DAY, isDefaultRules, normalizeRules, scoreDay, type DayEntry } from "@/lib/scoring";
 import { supabase } from "@/lib/supabase";
+import { useAvatar } from "@/lib/useAvatar";
 import { useEntries } from "@/lib/useEntries";
 import { useLeagues } from "@/lib/useLeagues";
 import { useScoringRules } from "@/lib/useScoringRules";
@@ -53,6 +54,7 @@ export function App() {
   const { leagues, reload: reloadLeagues } = useLeagues(userId);
   const { entries, shared, updatedAt, loaded, status, error, save } = useEntries(userId);
   const scoring = useScoringRules(userId);
+  const avatar = useAvatar(userId);
   const rules = scoring.rules;
 
   const [tab, setTab] = useState<Tab>("log");
@@ -160,11 +162,12 @@ export function App() {
             entries={entries}
             shared={shared}
             updatedAt={updatedAt}
+            avatarUrl={avatar.url}
             today={today}
           />
         )}
         {tab === "account" && (
-          <AccountTab session={session} rules={rules} onResetScoring={scoring.reset} onOpenScoring={openScoring} />
+          <AccountTab session={session} rules={rules} onResetScoring={scoring.reset} onOpenScoring={openScoring} avatarUrl={avatar.url} onAvatarChange={avatar.setUrl} />
         )}
       </main>
 

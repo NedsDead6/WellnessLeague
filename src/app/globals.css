@@ -2018,3 +2018,97 @@ button:focus-visible {
   gap: 4px;
   font-size: 13px;
 }
+
+.award-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.award-star {
+  color: var(--spiritual);
+  flex: none;
+}
+
+/* Avatars, photo upload, emoji pickers */
+.avatar {
+  overflow: hidden;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.table-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.photo-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.photo-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.file-button {
+  position: relative;
+  width: auto;
+  padding: 0 16px;
+  cursor: pointer;
+}
+
+.file-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+}
+
+.file-button.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.emoji-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--well);
+  border: 1px solid var(--line);
+}
+
+.composer-bar {
+  align-items: center;
+}
+
+.composer-count {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.feed li.post .post-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feed-reacts {
+  margin-top: 2px;
+}

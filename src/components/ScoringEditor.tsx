@@ -169,15 +169,18 @@ export function ScoringEditor({ rules, onChange, onReset, onBack, status, error,
                   <div className="row-top">
                     <span className="row-label">Healthy meals</span>
                     <span className="pill" style={{ background: tint(color), color }}>
-                      mixed +{fmtNum(rules.meals.mixed)}, healthy +{fmtNum(rules.meals.healthy)}
+                      mixed +{fmtNum(rules.meals.mixed)}, healthy +{fmtNum(rules.meals.healthy)}, great +{fmtNum(rules.meals.great)}
                     </span>
                   </div>
-                  <div className="rule-grid two">
+                  <div className="rule-grid">
                     <Field label="Mixed meal points">
                       {number("Mixed meal points", rules.meals.mixed, (n) => onChange({ ...rules, meals: { ...rules.meals, mixed: n } }))}
                     </Field>
                     <Field label="Healthy meal points">
                       {number("Healthy meal points", rules.meals.healthy, (n) => onChange({ ...rules, meals: { ...rules.meals, healthy: n } }))}
+                    </Field>
+                    <Field label="Great meal points">
+                      {number("Great meal points", rules.meals.great, (n) => onChange({ ...rules, meals: { ...rules.meals, great: n } }))}
                     </Field>
                   </div>
                 </div>

@@ -11,6 +11,8 @@ import {
   totalsFor,
   weekDays,
   weekMatchups,
+  toDisplay,
+  toStored,
   weeklyAwards,
   type LeagueMember,
 } from "./league";
@@ -229,5 +231,33 @@ describe("rest weeks", () => {
       const both = totalsFor(m, [...weekDays("2026-10-12"), ...weekDays("2026-10-19")]).total;
       expect(records[m.id].pointsFor).toBeCloseTo(both, 1);
     }
+  });
+});
+
+describe("more weekly awards", () => {
+  const members = scored([
+    member("a", { "2026-10-20": { workHours: 9, steps: 5000, socialHours: 1, exerciseMin: 30, meals: [3, 3, 3], drinks: 2 } }, true),
+    member("b", { "2026-10-20": { workHours: 2, steps: 12000, socialHours: 4, exerciseMin: 90, meals: [1, 0, 0] } }),
+  ]);
+  const byKey = Object.fromEntries(weeklyAwards(members, W2).map((a) => [a.key, a]));
+
+  it("names a winner for work, steps, exercise, meals, social and penalties", () => {
+    expect(byKey.grinder).toMatchObject({ memberId: "a", title: "The Grinder" });
+    expect(byKey.steps).toMatchObject({ memberId: "b", title: "Mileage Machine" });
+    expect(byKey.exercise).toMatchObject({ memberId: "b", detail: "1.5 hrs of exercise" });
+    expect(byKey.eater).toMatchObject({ memberId: "a", title: "Golden Fork" });
+    expect(byKey.social).toMatchObject({ memberId: "b" });
+    expect(byKey.clean).toMatchObject({ memberId: "b", detail: "no penalty points" });
+  });
+
+  it("gives no clean-living award when everyone is tied", () => {
+    const tied = scored([member("a", { "2026-10-20": { steps: 5000 } }, true), member("b", { "2026-10-20": { steps: 6000 } })]);
+    expect(weeklyAwards(tied, W2).some((a) => a.key === "clean")).toBe(false);
+  });
+
+  it("shows time goals in hours", () => {
+    expect(toDisplay("exerciseMin", 600)).toBe(10);
+    expect(toStored("readingMin", 2.5)).toBe(150);
+    expect(toDisplay("steps", 1000)).toBe(1000);
   });
 });

@@ -12,7 +12,7 @@ export interface DayEntry {
   /** What the exercise was, in the person's own words. Visible to league mates. */
   exerciseNote: string;
   steps: number;
-  /** Three meals, each graded 0 (skipped or junk), 1 (mixed), 2 (healthy). */
+  /** Three meals, each graded 0 (skipped or junk), 1 (mixed), 2 (healthy), 3 (great). */
   meals: [number, number, number];
   sleepHours: number;
   meditationMin: number;
@@ -129,8 +129,8 @@ export interface Rule {
 
 export interface ScoringRules {
   rules: Record<RuleKey, Rule>;
-  /** Points for a mixed (1) and a healthy (2) meal. A junk meal (0) earns nothing. */
-  meals: { mixed: number; healthy: number };
+  /** Points for a mixed (1), healthy (2) and great (3) meal. A junk meal (0) earns nothing. */
+  meals: { mixed: number; healthy: number; great: number };
   /** Points per hour up to 8 hours, plus a bonus at 7 and at 8 or more hours. */
   sleep: { perHour: number; bonus7: number; bonus8: number };
   balanceBonus: number;
@@ -159,7 +159,7 @@ export const DEFAULT_RULES: ScoringRules = {
     cigarettes: { points: -0.5, per: 1, max: null },
     masturbation: { points: -1, per: 1, max: 3 },
   },
-  meals: { mixed: 1, healthy: 2 },
+  meals: { mixed: 1, healthy: 2, great: 3 },
   sleep: { perHour: 1, bonus7: 1, bonus8: 2 },
   balanceBonus: 2,
   streakBonus: 2,
@@ -197,6 +197,7 @@ export function normalizeRules(raw: unknown): ScoringRules {
     meals: {
       mixed: finite(src.meals?.mixed, DEFAULT_RULES.meals.mixed),
       healthy: finite(src.meals?.healthy, DEFAULT_RULES.meals.healthy),
+      great: finite(src.meals?.great, DEFAULT_RULES.meals.great),
     },
     sleep: {
       perHour: finite(src.sleep?.perHour, DEFAULT_RULES.sleep.perHour),
@@ -220,7 +221,7 @@ function ruleScore(value: number, rule: Rule): number {
 
 /** Points for a meal graded 0 (junk), 1 (mixed) or 2 (healthy). */
 export function mealPoints(grade: number, rules: ScoringRules = DEFAULT_RULES): number {
-  return grade >= 2 ? rules.meals.healthy : grade >= 1 ? rules.meals.mixed : 0;
+  return grade >= 3 ? rules.meals.great : grade >= 2 ? rules.meals.healthy : grade >= 1 ? rules.meals.mixed : 0;
 }
 
 export function sleepPoints(hours: number, rules: ScoringRules = DEFAULT_RULES): number {
@@ -237,7 +238,7 @@ export function pillarMax(rules: ScoringRules): Record<Pillar, number> {
     physical:
       cap("exercise") +
       cap("steps") +
-      3 * rules.meals.healthy +
+      3 * Math.max(rules.meals.healthy, rules.meals.great) +
       8 * rules.sleep.perHour +
       Math.max(rules.sleep.bonus7, rules.sleep.bonus8),
     mental: cap("work") + cap("social") + cap("calls") + cap("reading") + cap("journal"),

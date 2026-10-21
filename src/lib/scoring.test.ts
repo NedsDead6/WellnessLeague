@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RULES, EMPTY_DAY, isDefaultRules, normalizeRules, pillarMax, scoreDay, sleepPoints } from "./scoring";
+import { DEFAULT_RULES, EMPTY_DAY, isDefaultRules, mealPoints, normalizeRules, pillarMax, scoreDay, sleepPoints } from "./scoring";
 
 describe("scoreDay", () => {
   it("scores an empty day as zero", () => {
@@ -90,7 +90,7 @@ describe("custom scoring rules", () => {
     const day = { ...EMPTY_DAY, steps: 8000, workHours: 2, worshipMin: 15 };
     expect(scoreDay(day, 7, rules).balanceBonus).toBe(5);
     expect(scoreDay(day, 7, rules).streakBonus).toBe(4);
-    expect(pillarMax(DEFAULT_RULES)).toEqual({ physical: 48, mental: 30, spiritual: 20 });
+    expect(pillarMax(DEFAULT_RULES)).toEqual({ physical: 51, mental: 30, spiritual: 20 });
   });
 
   it("scores calls, the new penalty and meditation as spiritual", () => {
@@ -106,5 +106,12 @@ describe("custom scoring rules", () => {
   it("keeps a saved no-limit penalty but fills the default cap when none was saved", () => {
     expect(normalizeRules({}).rules.masturbation.max).toBe(3);
     expect(normalizeRules({ rules: { masturbation: { points: 1, per: 1, max: null } } }).rules.masturbation.max).toBeNull();
+  });
+
+  it("scores a great meal (grade 3) with its own points", () => {
+    expect(mealPoints(3)).toBe(3);
+    expect(mealPoints(2)).toBe(2);
+    expect(scoreDay({ ...EMPTY_DAY, meals: [3, 3, 0] }, 0).categories.meals).toBe(6);
+    expect(normalizeRules({ meals: { great: 5 } }).meals.great).toBe(5);
   });
 });

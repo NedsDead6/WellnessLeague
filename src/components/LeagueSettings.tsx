@@ -9,6 +9,7 @@ import {
   weekOf,
   type Challenge,
   type ChallengeMetric,
+  toStored,
 } from "@/lib/league";
 import { normalizeRules, type ScoringRules } from "@/lib/scoring";
 import { supabase } from "@/lib/supabase";
@@ -124,7 +125,7 @@ function GoalsManager({
     const { error } = await supabase.from("league_challenges").insert({
       league_id: league.id,
       metric,
-      target,
+      target: toStored(metric, target),
       week_start: which === "this" ? thisWeek : addDays(thisWeek, 7),
       created_by: userId,
     });
@@ -182,7 +183,7 @@ function GoalsManager({
           </div>
           <div className="rule-field">
             <span>League total ({metricInfo(metric).unit})</span>
-            <NumberField className="fill" label="Goal total" value={target} max={10000000} decimals={false} unit="" min={1} onCommit={setTarget} />
+            <NumberField className="fill" label="Goal total" value={target} max={10000000} decimals={metricInfo(metric).unit === "hours"} places={1} unit="" min={0.1} onCommit={setTarget} />
           </div>
           <div className="rule-field">
             <span>Week</span>

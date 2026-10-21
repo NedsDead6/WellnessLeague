@@ -242,9 +242,9 @@ export function DailyLog({
                       <span className="pill" style={pillStyle(GROUP_COLORS.physical, points)}>{fmtSigned(points)}</span>
                     </div>
                     <div className="row-bottom">
-                      <span className="row-sub">0 junk, 1 mixed, 2 healthy</span>
+                      <span className="row-sub">0 junk, 1 mixed, 2 healthy, 3 great</span>
                       <div className="grades">
-                        {[0, 1, 2].map((grade) => (
+                        {[0, 1, 2, 3].map((grade) => (
                           <button
                             key={grade}
                             className="square"

@@ -11,6 +11,7 @@ export interface LeagueMember {
   id: string;
   name: string;
   you: boolean;
+  avatarUrl?: string | null;
   /** Days this person shared with the league, by day. */
   entries: Record<string, DayEntry>;
   /** When each of those days was last saved (ISO time), where known. */
@@ -180,7 +181,18 @@ export function weeklyAwards(members: ScoredMember[], weekStart: string): Award[
     const before = totalsFor(m, previous);
     const balancedDays = days.filter((d) => (m.scores[d]?.balanceBonus ?? 0) > 0).length;
     const weakestPillar = Math.min(now.physical, now.mental, now.spiritual);
-    return { m, now, before, balancedDays, weakestPillar };
+    const sum = (pick: (e: DayEntry) => number) => days.reduce((n, d) => n + (m.entries[d] ? pick(m.entries[d]) : 0), 0);
+    return {
+      m,
+      now,
+      before,
+      balancedDays,
+      weakestPillar,
+      work: sum((e) => e.workHours),
+      social: sum((e) => e.socialHours),
+      steps: sum((e) => e.steps),
+      exercise: sum((e) => e.exerciseMin),
+    };
   });
   const awards: Award[] = [];
   const best = <T,>(list: T[], score: (row: T) => number, tiebreak: (row: T) => number = () => 0): T | null =>
@@ -217,6 +229,32 @@ export function weeklyAwards(members: ScoredMember[], weekStart: string): Award[
     const king = best(rows.filter((r) => r.now[key] > 0), (r) => r.now[key]);
     if (king) awards.push({ key, title, memberId: king.m.id, detail: pts(king.now[key]) });
   }
+
+  const hours = (n: number) => `${round1(n)} ${round1(n) === 1 ? "hr" : "hrs"}`;
+  const grinder = best(rows.filter((r) => r.work > 0), (r) => r.work);
+  if (grinder) awards.push({ key: "grinder", title: "The Grinder", memberId: grinder.m.id, detail: `${hours(grinder.work)} worked` });
+
+  const miles = best(rows.filter((r) => r.steps > 0), (r) => r.steps);
+  if (miles) awards.push({ key: "steps", title: "Mileage Machine", memberId: miles.m.id, detail: `${miles.steps.toLocaleString("en-US")} steps` });
+
+  const sweat = best(rows.filter((r) => r.exercise > 0), (r) => r.exercise);
+  if (sweat) awards.push({ key: "exercise", title: "Sweat Equity", memberId: sweat.m.id, detail: `${hours(sweat.exercise / 60)} of exercise` });
+
+  const active = rows.filter((r) => r.now.shared > 0);
+  const clean = best(active, (r) => r.now.penalties, (r) => r.now.total);
+  if (clean && active.length > 1 && active.some((r) => r.now.penalties !== clean.now.penalties))
+    awards.push({
+      key: "clean",
+      title: "Halo Award",
+      memberId: clean.m.id,
+      detail: clean.now.penalties === 0 ? "no penalty points" : `only ${pts(-clean.now.penalties)} in penalties`,
+    });
+
+  const eater = best(rows.filter((r) => r.now.categories.meals > 0), (r) => r.now.categories.meals);
+  if (eater) awards.push({ key: "eater", title: "Golden Fork", memberId: eater.m.id, detail: `${pts(eater.now.categories.meals)} from meals` });
+
+  const butterfly = best(rows.filter((r) => r.social > 0), (r) => r.social);
+  if (butterfly) awards.push({ key: "social", title: "Social Butterfly", memberId: butterfly.m.id, detail: `${hours(butterfly.social)} with people` });
   return awards;
 }
 
@@ -286,13 +324,18 @@ export function seasonStats(members: ScoredMember[]): SeasonStats {
 
 export const CHALLENGE_METRICS = [
   { id: "steps", label: "Steps", unit: "steps", suggested: 500000 },
-  { id: "exerciseMin", label: "Exercise", unit: "min", suggested: 600 },
-  { id: "meditationMin", label: "Meditation", unit: "min", suggested: 300 },
-  { id: "readingMin", label: "Reading", unit: "min", suggested: 300 },
-  { id: "worshipMin", label: "Worship and prayer", unit: "min", suggested: 300 },
+  { id: "exerciseMin", label: "Exercise", unit: "hours", suggested: 10 },
+  { id: "meditationMin", label: "Meditation", unit: "hours", suggested: 5 },
+  { id: "readingMin", label: "Reading", unit: "hours", suggested: 5 },
+  { id: "worshipMin", label: "Worship and prayer", unit: "hours", suggested: 5 },
   { id: "serviceHours", label: "Service", unit: "hours", suggested: 10 },
   { id: "points", label: "Points", unit: "points", suggested: 500 },
 ] as const;
+
+/** Time goals are saved in minutes but shown and typed in hours. */
+const MINUTE_METRICS: string[] = ["exerciseMin", "meditationMin", "readingMin", "worshipMin"];
+export const toDisplay = (metric: string, value: number) => (MINUTE_METRICS.includes(metric) ? Math.round((value / 60) * 10) / 10 : value);
+export const toStored = (metric: string, value: number) => (MINUTE_METRICS.includes(metric) ? Math.round(value * 60) : value);
 
 export type ChallengeMetric = (typeof CHALLENGE_METRICS)[number]["id"];
 
@@ -309,7 +352,7 @@ export function metricInfo(metric: string) {
 
 export function challengeTitle(c: Challenge) {
   const info = metricInfo(c.metric);
-  return `${c.target.toLocaleString("en-US")} ${info.unit === "points" ? "points" : info.label.toLowerCase() === "steps" ? "steps" : `${info.unit} of ${info.label.toLowerCase()}`} together`;
+  return `${toDisplay(c.metric, c.target).toLocaleString("en-US")} ${info.unit === "points" ? "points" : info.label.toLowerCase() === "steps" ? "steps" : `${info.unit} of ${info.label.toLowerCase()}`} together`;
 }
 
 export function challengeProgress(c: Challenge, members: ScoredMember[]) {
@@ -337,6 +380,15 @@ export interface Post {
   created_at: string;
 }
 
+/** An emoji on a feed item, identified by the item's key. */
+export interface FeedReaction {
+  id?: string;
+  league_id: string;
+  item_key: string;
+  reactor_id: string;
+  emoji: string;
+}
+
 export interface Reaction {
   id?: string;
   league_id: string;
@@ -355,7 +407,7 @@ export interface FeedItem {
   exact: boolean;
   text: string;
   /** Set for messages members wrote, so the feed can show them as posts. */
-  post?: { id: string; authorId: string; name: string; body: string; mine: boolean };
+  post?: { id: string; authorId: string; name: string; body: string; mine: boolean; avatarUrl?: string | null };
 }
 
 /** A friendly time for the feed: "12 min ago", "Today, 8:05 PM", "Tue, 8:05 PM" or "Oct 12, 8:05 PM". */
@@ -417,7 +469,7 @@ export function feedItems(
       at: p.created_at,
       exact: true,
       text: `${label(p.user_id)}: ${p.body}`,
-      post: { id: p.id, authorId: p.user_id, name: label(p.user_id), body: p.body, mine: Boolean(author?.you) },
+      post: { id: p.id, authorId: p.user_id, name: label(p.user_id), body: p.body, mine: Boolean(author?.you), avatarUrl: author?.avatarUrl },
     });
   }
 
