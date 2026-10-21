@@ -324,6 +324,15 @@ export function challengeProgress(c: Challenge, members: ScoredMember[]) {
 
 // ---- Activity feed ----
 
+/** A message a member posted to the league feed. */
+export interface Post {
+  id: string;
+  league_id: string;
+  user_id: string;
+  body: string;
+  created_at: string;
+}
+
 export interface Reaction {
   id?: string;
   league_id: string;
@@ -341,6 +350,8 @@ export interface FeedItem {
   /** False when only the day is known, so no clock time is shown. */
   exact: boolean;
   text: string;
+  /** Set for messages members wrote, so the feed can show them as posts. */
+  post?: { id: string; authorId: string; name: string; body: string; mine: boolean };
 }
 
 /** A friendly time for the feed: "12 min ago", "Today, 8:05 PM", "Tue, 8:05 PM" or "Oct 12, 8:05 PM". */
@@ -359,10 +370,10 @@ export function formatWhen(iso: string, now: Date = new Date()): string {
   return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${time}`;
 }
 
-/** Highlights from the last two weeks of shared days, plus reactions and joins. */
+/** Highlights from the last two weeks of shared days, plus member posts and joins. Reactions are not part of the feed. */
 export function feedItems(
   members: ScoredMember[],
-  reactions: Reaction[],
+  posts: Post[],
   joins: { userId: string; joinedAt: string }[],
   today: string,
 ): FeedItem[] {
@@ -379,7 +390,7 @@ export function feedItems(
       const found: string[] = [];
       if (total >= 30) found.push(`had a ${round1(total)}-point day`);
       if (entry.steps >= 10000) found.push(`walked ${entry.steps.toLocaleString("en-US")} steps`);
-      if (entry.exerciseMin >= 60) found.push(`exercised for ${entry.exerciseMin} min`);
+      if (entry.exerciseMin >= 60) found.push(`exercised for ${entry.exerciseMin} min${entry.exerciseNote ? `: ${entry.exerciseNote}` : ""}`);
       if (entry.readingMin >= 60) found.push(`read for ${entry.readingMin} min`);
       if (entry.meditationMin >= 30) found.push(`meditated for ${entry.meditationMin} min`);
       for (const what of found.slice(0, 2)) {
@@ -394,13 +405,15 @@ export function feedItems(
     }
   }
 
-  for (const r of reactions) {
-    if (r.day < oldest) continue;
+  for (const p of posts) {
+    if (p.created_at.slice(0, 10) < oldest) continue;
+    const author = nameOf(p.user_id);
     items.push({
-      key: `r-${r.reactor_id}-${r.target_user_id}-${r.day}-${r.emoji}`,
-      at: r.created_at ?? `${r.day}T13:00:00`,
-      exact: Boolean(r.created_at),
-      text: `${label(r.reactor_id)} ${r.emoji} ${r.target_user_id === r.reactor_id ? verb(r.reactor_id, "your own", "their own") : `${label(r.target_user_id)}${nameOf(r.target_user_id)?.you ? "r" : "'s"}`} ${dayLong(r.day).split(",")[0]}`,
+      key: `p-${p.id}`,
+      at: p.created_at,
+      exact: true,
+      text: `${label(p.user_id)}: ${p.body}`,
+      post: { id: p.id, authorId: p.user_id, name: label(p.user_id), body: p.body, mine: Boolean(author?.you) },
     });
   }
 

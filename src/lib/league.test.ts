@@ -143,19 +143,25 @@ describe("activity feed", () => {
     member("b", { "2026-10-21": { steps: 16000, exerciseMin: 90 } }),
   ]);
 
-  it("lists highlights, reactions and joins, newest first", () => {
+  it("lists highlights, posts and joins, newest first, without reactions", () => {
     const items = feedItems(
       members,
-      [{ league_id: "L", target_user_id: "b", day: "2026-10-21", reactor_id: "a", emoji: "🔥", created_at: "2026-10-21T20:00:00Z" }],
+      [{ id: "p1", league_id: "L", user_id: "b", body: "Big day 💪", created_at: "2026-10-21T20:00:00Z" }],
       [{ userId: "b", joinedAt: "2026-10-19T09:00:00Z" }],
       "2026-10-21",
     );
-    expect(items[0].text).toContain("You 🔥 B's Wednesday");
+    expect(items[0]).toMatchObject({ text: "B: Big day 💪", post: { id: "p1", name: "B", mine: false } });
     expect(items.some((i) => i.text.includes("B walked 16,000 steps"))).toBe(true);
     expect(items.some((i) => i.text.includes("You walked 12,000 steps"))).toBe(true);
     expect(items.some((i) => i.text === "B joined the league")).toBe(true);
+    expect(items.some((i) => i.text.includes("🔥"))).toBe(false);
     const times = items.map((i) => Date.parse(i.at));
     expect([...times].sort((x, y) => y - x)).toEqual(times);
+  });
+
+  it("shows what the exercise was in the highlight", () => {
+    const m = scored([member("b", { "2026-10-21": { exerciseMin: 75, exerciseNote: "Trail run" } })]);
+    expect(feedItems(m, [], [], "2026-10-21")[0].text).toContain("exercised for 75 min: Trail run");
   });
 
   it("skips anything older than two weeks", () => {

@@ -9,14 +9,17 @@ export type Group = Pillar | "penalty";
 /** One day of entries, in natural units. */
 export interface DayEntry {
   exerciseMin: number;
+  /** What the exercise was, in the person's own words. Visible to league mates. */
+  exerciseNote: string;
   steps: number;
   /** Three meals, each graded 0 (skipped or junk), 1 (mixed), 2 (healthy). */
   meals: [number, number, number];
   sleepHours: number;
-  water: boolean;
   meditationMin: number;
   workHours: number;
   socialHours: number;
+  /** Phone calls to family or friends. */
+  calls: number;
   readingMin: number;
   journalMin: number;
   worshipMin: number;
@@ -25,17 +28,19 @@ export interface DayEntry {
   drinks: number;
   weed: number;
   cigarettes: number;
+  masturbation: number;
 }
 
 export const EMPTY_DAY: DayEntry = {
   exerciseMin: 0,
+  exerciseNote: "",
   steps: 0,
   meals: [0, 0, 0],
   sleepHours: 0,
-  water: false,
   meditationMin: 0,
   workHours: 0,
   socialHours: 0,
+  calls: 0,
   readingMin: 0,
   journalMin: 0,
   worshipMin: 0,
@@ -44,6 +49,7 @@ export const EMPTY_DAY: DayEntry = {
   drinks: 0,
   weed: 0,
   cigarettes: 0,
+  masturbation: 0,
 };
 
 export type CategoryKey =
@@ -51,10 +57,10 @@ export type CategoryKey =
   | "steps"
   | "meals"
   | "sleep"
-  | "water"
   | "meditation"
   | "work"
   | "social"
+  | "calls"
   | "reading"
   | "journal"
   | "worship"
@@ -62,25 +68,27 @@ export type CategoryKey =
   | "screen"
   | "drinks"
   | "weed"
-  | "cigarettes";
+  | "cigarettes"
+  | "masturbation";
 
 export const CATEGORIES: { key: CategoryKey; label: string; group: Group }[] = [
   { key: "exercise", label: "Exercise", group: "physical" },
   { key: "steps", label: "Steps", group: "physical" },
   { key: "meals", label: "Healthy meals", group: "physical" },
   { key: "sleep", label: "Sleep", group: "physical" },
-  { key: "water", label: "Water", group: "physical" },
-  { key: "meditation", label: "Meditation", group: "mental" },
   { key: "work", label: "Work", group: "mental" },
   { key: "social", label: "Social time", group: "mental" },
+  { key: "calls", label: "Calls to family or friends", group: "mental" },
   { key: "reading", label: "Reading", group: "mental" },
   { key: "journal", label: "Journaling or gratitude", group: "mental" },
+  { key: "meditation", label: "Meditation", group: "spiritual" },
   { key: "worship", label: "Worship and prayer", group: "spiritual" },
   { key: "service", label: "Service or volunteering", group: "spiritual" },
   { key: "screen", label: "Screen time (non-work)", group: "penalty" },
   { key: "drinks", label: "Alcoholic drinks", group: "penalty" },
   { key: "weed", label: "Weed", group: "penalty" },
   { key: "cigarettes", label: "Cigarettes", group: "penalty" },
+  { key: "masturbation", label: "Masturbation", group: "penalty" },
 ];
 
 export type CategoryPoints = Record<CategoryKey, number>;
@@ -96,6 +104,7 @@ export type RuleKey =
   | "meditation"
   | "work"
   | "social"
+  | "calls"
   | "reading"
   | "journal"
   | "worship"
@@ -103,7 +112,8 @@ export type RuleKey =
   | "screen"
   | "drinks"
   | "weed"
-  | "cigarettes";
+  | "cigarettes"
+  | "masturbation";
 
 /**
  * `points` for every `per` units, up to `max` points (null means no cap).
@@ -123,13 +133,12 @@ export interface ScoringRules {
   meals: { mixed: number; healthy: number };
   /** Points per hour up to 8 hours, plus a bonus at 7 and at 8 or more hours. */
   sleep: { perHour: number; bonus7: number; bonus8: number };
-  water: number;
   balanceBonus: number;
   /** Paid on every 7th consecutive logged day. */
   streakBonus: number;
 }
 
-export const PENALTY_KEYS: RuleKey[] = ["screen", "drinks", "weed", "cigarettes"];
+export const PENALTY_KEYS: RuleKey[] = ["screen", "drinks", "weed", "cigarettes", "masturbation"];
 
 /** The standard scoring. Leagues always use this; people can customize their own copy. */
 export const DEFAULT_RULES: ScoringRules = {
@@ -139,6 +148,7 @@ export const DEFAULT_RULES: ScoringRules = {
     meditation: { points: 1, per: 15, max: 8 },
     work: { points: 1, per: 1, max: 14 },
     social: { points: 1, per: 1, max: 6 },
+    calls: { points: 1, per: 1, max: 3 },
     reading: { points: 1, per: 30, max: 4 },
     journal: { points: 1, per: 15, max: 3 },
     worship: { points: 1, per: 15, max: 8 },
@@ -147,10 +157,10 @@ export const DEFAULT_RULES: ScoringRules = {
     drinks: { points: -0.5, per: 1, max: null },
     weed: { points: -5, per: 1, max: null },
     cigarettes: { points: -0.5, per: 1, max: null },
+    masturbation: { points: -1, per: 1, max: 3 },
   },
   meals: { mixed: 1, healthy: 2 },
   sleep: { perHour: 1, bonus7: 1, bonus8: 2 },
-  water: 1,
   balanceBonus: 2,
   streakBonus: 2,
 };
@@ -169,9 +179,11 @@ export function normalizeRules(raw: unknown): ScoringRules {
     const rawPoints = typeof given.points === "number" ? Math.abs(given.points) : Number.NaN;
     const points = Number.isFinite(rawPoints) ? rawPoints : Math.abs(base.points);
     const max = penalty
-      ? typeof given.max === "number" && given.max >= 0
-        ? given.max
-        : null
+      ? "max" in given
+        ? typeof given.max === "number" && given.max >= 0
+          ? given.max
+          : null
+        : base.max
       : finite(given.max, base.max as number);
     rules[key] = {
       points: penalty ? -points : points,
@@ -191,7 +203,6 @@ export function normalizeRules(raw: unknown): ScoringRules {
       bonus7: finite(src.sleep?.bonus7, DEFAULT_RULES.sleep.bonus7),
       bonus8: finite(src.sleep?.bonus8, DEFAULT_RULES.sleep.bonus8),
     },
-    water: finite(src.water, DEFAULT_RULES.water),
     balanceBonus: finite(src.balanceBonus, DEFAULT_RULES.balanceBonus),
     streakBonus: finite(src.streakBonus, DEFAULT_RULES.streakBonus),
   };
@@ -228,10 +239,9 @@ export function pillarMax(rules: ScoringRules): Record<Pillar, number> {
       cap("steps") +
       3 * rules.meals.healthy +
       8 * rules.sleep.perHour +
-      Math.max(rules.sleep.bonus7, rules.sleep.bonus8) +
-      rules.water,
-    mental: cap("meditation") + cap("work") + cap("social") + cap("reading") + cap("journal"),
-    spiritual: cap("worship") + cap("service"),
+      Math.max(rules.sleep.bonus7, rules.sleep.bonus8),
+    mental: cap("work") + cap("social") + cap("calls") + cap("reading") + cap("journal"),
+    spiritual: cap("meditation") + cap("worship") + cap("service"),
   };
 }
 
@@ -243,10 +253,10 @@ export function categoryPoints(e: DayEntry, rules: ScoringRules = DEFAULT_RULES)
     steps: ruleScore(e.steps, r.steps),
     meals: round3(e.meals.reduce((sum, grade) => sum + mealPoints(grade, rules), 0)),
     sleep: sleepPoints(e.sleepHours, rules),
-    water: e.water ? rules.water : 0,
     meditation: ruleScore(e.meditationMin, r.meditation),
     work: ruleScore(e.workHours, r.work),
     social: ruleScore(e.socialHours, r.social),
+    calls: ruleScore(e.calls, r.calls),
     reading: ruleScore(e.readingMin, r.reading),
     journal: ruleScore(e.journalMin, r.journal),
     worship: ruleScore(e.worshipMin, r.worship),
@@ -255,6 +265,7 @@ export function categoryPoints(e: DayEntry, rules: ScoringRules = DEFAULT_RULES)
     drinks: ruleScore(e.drinks, r.drinks),
     weed: ruleScore(e.weed, r.weed),
     cigarettes: ruleScore(e.cigarettes, r.cigarettes),
+    masturbation: ruleScore(e.masturbation, r.masturbation),
   };
 }
 

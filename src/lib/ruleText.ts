@@ -6,6 +6,7 @@ const WORDS: Record<RuleKey, [string, string]> = {
   meditation: ["min", "min"],
   work: ["hour", "hours"],
   social: ["hour", "hours"],
+  calls: ["call", "calls"],
   reading: ["min", "min"],
   journal: ["min", "min"],
   worship: ["min", "min"],
@@ -14,6 +15,7 @@ const WORDS: Record<RuleKey, [string, string]> = {
   drinks: ["drink", "drinks"],
   weed: ["time", "times"],
   cigarettes: ["cigarette", "cigarettes"],
+  masturbation: ["time", "times"],
 };
 
 export const fmtNum = (n: number) => Number(n.toFixed(3)).toLocaleString("en-US", { maximumFractionDigits: 3 });

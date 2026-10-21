@@ -8,18 +8,19 @@ export const CATEGORY_COLORS: Record<CategoryKey, string> = {
   steps: "#19cf75",
   meals: "#8affc0",
   sleep: "#12a352",
-  water: "#c2ffe0",
-  meditation: "#b58cff",
   work: "#8f63f0",
   social: "#d4b8ff",
+  calls: "#a47bf5",
   reading: "#6f45d1",
   journal: "#e6d6ff",
+  meditation: "#ffe98a",
   worship: "#ffd23d",
   service: "#e0a800",
   screen: "#ff4d6d",
   drinks: "#ff7a90",
   weed: "#d92a4b",
   cigarettes: "#ffa3b3",
+  masturbation: "#ff5c7a",
 };
 
 export const BONUS_COLOR = "#e6eeff";

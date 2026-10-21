@@ -170,8 +170,8 @@ function LeagueView({
   const weekStart = addDays(currentWeek, offset * 7);
   const earliest = firstWeek(members) ?? currentWeek;
   const feed = useMemo(
-    () => feedItems(members, data.reactions, data.others.filter((o) => o.joinedAt).map((o) => ({ userId: o.id, joinedAt: o.joinedAt })), today),
-    [members, data.reactions, data.others, today],
+    () => feedItems(members, data.posts, data.others.filter((o) => o.joinedAt).map((o) => ({ userId: o.id, joinedAt: o.joinedAt })), today),
+    [members, data.posts, data.others, today],
   );
 
   if (settingsOpen) {
@@ -249,7 +249,7 @@ function LeagueView({
         />
       )}
       {section === "goals" && <GoalsSection challenges={data.challenges} members={members} weekStart={weekStart} />}
-      {section === "feed" && <FeedSection items={feed} />}
+      {section === "feed" && <FeedSection items={feed} onPost={data.addPost} onDelete={(id) => void data.deletePost(id)} />}
     </section>
   );
 }

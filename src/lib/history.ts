@@ -25,13 +25,14 @@ export function isLogged(entry: DayEntry | undefined): boolean {
   if (!entry) return false;
   return (
     entry.exerciseMin !== 0 ||
+    entry.exerciseNote.trim() !== "" ||
     entry.steps !== 0 ||
     entry.meals.some((m) => m !== 0) ||
     entry.sleepHours !== 0 ||
-    entry.water ||
     entry.meditationMin !== 0 ||
     entry.workHours !== 0 ||
     entry.socialHours !== 0 ||
+    entry.calls !== 0 ||
     entry.readingMin !== 0 ||
     entry.journalMin !== 0 ||
     entry.worshipMin !== 0 ||
@@ -39,7 +40,8 @@ export function isLogged(entry: DayEntry | undefined): boolean {
     entry.screenHours !== 0 ||
     entry.drinks !== 0 ||
     entry.weed !== 0 ||
-    entry.cigarettes !== 0
+    entry.cigarettes !== 0 ||
+    entry.masturbation !== 0
   );
 }
 
@@ -54,7 +56,7 @@ export function normalizeEntry(raw: unknown): DayEntry {
     ...source,
     journalMin: source.journalMin ?? (typeof legacy === "number" ? legacy * 15 : 0),
     meals: [Number(meals[0]) || 0, Number(meals[1]) || 0, Number(meals[2]) || 0],
-    water: Boolean(source.water),
+    exerciseNote: typeof source.exerciseNote === "string" ? source.exerciseNote.slice(0, 120) : "",
   };
 }
 

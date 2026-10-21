@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchAll } from "./fetchAll";
 import { normalizeEntry } from "./history";
-import type { Challenge, Reaction } from "./league";
+import type { Challenge, Post, Reaction } from "./league";
 import type { DayEntry } from "./scoring";
 import { supabase } from "./supabase";
 
@@ -26,6 +26,7 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
   const [others, setOthers] = useState<OtherMember[]>([]);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,11 +88,19 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
       const reactionRows = await fetchAll((from, to) =>
         client.from("league_reactions").select("id, league_id, target_user_id, day, reactor_id, emoji, created_at").eq("league_id", leagueId).order("created_at").range(from, to),
       );
+      // Posts are optional: if the feed migration hasn't been run yet, the rest of the league still loads.
+      const postRows = await client
+        .from("league_posts")
+        .select("id, league_id, user_id, body, created_at")
+        .eq("league_id", leagueId)
+        .order("created_at", { ascending: false })
+        .limit(200);
       const challengeRows = await client.from("league_challenges").select("id, metric, target, week_start").eq("league_id", leagueId);
       if (challengeRows.error) throw new Error(challengeRows.error.message);
 
       setOthers(others.map((m) => ({ ...m, entries: byUser.get(m.id) ?? {}, updatedAt: stamps.get(m.id) ?? {} })));
       setReactions(reactionRows as Reaction[]);
+      setPosts(postRows.error ? [] : ((postRows.data ?? []) as Post[]));
       setChallenges(((challengeRows.data ?? []) as any[]).map((c) => ({ ...c, target: Number(c.target) })) as Challenge[]);
       setError(null);
     } catch (e) {
@@ -134,5 +143,32 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
     [leagueId, userId, reactions],
   );
 
-  return { others, reactions, challenges, loaded, error, reload: load, toggleReaction };
+  /** Posts a message to the feed. Returns an error message, or null on success. */
+  const addPost = useCallback(
+    async (body: string): Promise<string | null> => {
+      const text = body.trim();
+      if (!supabase || !leagueId || !userId || !text) return null;
+      const { data, error: failed } = await supabase
+        .from("league_posts")
+        .insert({ league_id: leagueId, user_id: userId, body: text })
+        .select("id, league_id, user_id, body, created_at")
+        .single();
+      if (failed || !data) return failed?.message ?? "Couldn't post.";
+      setPosts((all) => [data as Post, ...all]);
+      return null;
+    },
+    [leagueId, userId],
+  );
+
+  const deletePost = useCallback(
+    async (id: string) => {
+      if (!supabase) return;
+      setPosts((all) => all.filter((p) => p.id !== id));
+      const { error: failed } = await supabase.from("league_posts").delete().eq("id", id);
+      if (failed) setError(failed.message);
+    },
+    [],
+  );
+
+  return { others, reactions, challenges, posts, loaded, error, reload: load, toggleReaction, addPost, deletePost };
 }

@@ -90,6 +90,21 @@ describe("custom scoring rules", () => {
     const day = { ...EMPTY_DAY, steps: 8000, workHours: 2, worshipMin: 15 };
     expect(scoreDay(day, 7, rules).balanceBonus).toBe(5);
     expect(scoreDay(day, 7, rules).streakBonus).toBe(4);
-    expect(pillarMax(DEFAULT_RULES)).toEqual({ physical: 49, mental: 35, spiritual: 12 });
+    expect(pillarMax(DEFAULT_RULES)).toEqual({ physical: 48, mental: 30, spiritual: 20 });
+  });
+
+  it("scores calls, the new penalty and meditation as spiritual", () => {
+    const day = { ...EMPTY_DAY, calls: 5, masturbation: 5, meditationMin: 30 };
+    const score = scoreDay(day, 0);
+    expect(score.categories.calls).toBe(3);
+    expect(score.categories.masturbation).toBe(-3);
+    expect(score.mental).toBe(3);
+    expect(score.spiritual).toBe(2);
+    expect(score.penalties).toBe(-3);
+  });
+
+  it("keeps a saved no-limit penalty but fills the default cap when none was saved", () => {
+    expect(normalizeRules({}).rules.masturbation.max).toBe(3);
+    expect(normalizeRules({ rules: { masturbation: { points: 1, per: 1, max: null } } }).rules.masturbation.max).toBeNull();
   });
 });

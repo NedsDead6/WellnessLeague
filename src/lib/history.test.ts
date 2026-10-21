@@ -86,7 +86,8 @@ describe("history", () => {
     expect(isLogged(EMPTY_DAY)).toBe(false);
     expect(isLogged(undefined)).toBe(false);
     expect(isLogged(walked(1000))).toBe(true);
-    expect(isLogged({ ...EMPTY_DAY, water: true })).toBe(true);
+    expect(isLogged({ ...EMPTY_DAY, exerciseNote: "Yoga" })).toBe(true);
+    expect(isLogged({ ...EMPTY_DAY, calls: 1 })).toBe(true);
   });
 
   it("fills in missing fields on stored entries", () => {

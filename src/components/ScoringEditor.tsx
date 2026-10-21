@@ -33,9 +33,9 @@ const SECTIONS: { id: Group; title: string; rows: RuleRow[] }[] = [
     id: "mental",
     title: "Mental",
     rows: [
-      { key: "meditation", label: "Meditation", unit: "min" },
       { key: "work", label: "Work", unit: "hrs" },
       { key: "social", label: "Social time", unit: "hrs" },
+      { key: "calls", label: "Calls to family or friends", unit: "calls" },
       { key: "reading", label: "Reading", unit: "min" },
       { key: "journal", label: "Journaling or gratitude", unit: "min" },
     ],
@@ -44,6 +44,7 @@ const SECTIONS: { id: Group; title: string; rows: RuleRow[] }[] = [
     id: "spiritual",
     title: "Spiritual",
     rows: [
+      { key: "meditation", label: "Meditation", unit: "min" },
       { key: "worship", label: "Worship and prayer", unit: "min" },
       { key: "service", label: "Service or volunteering", unit: "hrs" },
     ],
@@ -56,6 +57,7 @@ const SECTIONS: { id: Group; title: string; rows: RuleRow[] }[] = [
       { key: "drinks", label: "Alcoholic drinks", unit: "drinks" },
       { key: "weed", label: "Weed", unit: "times" },
       { key: "cigarettes", label: "Cigarettes", unit: "cigs" },
+      { key: "masturbation", label: "Masturbation", unit: "times" },
     ],
   },
 ];
@@ -146,18 +148,16 @@ export function ScoringEditor({ rules, onChange, onReset, onBack, status, error,
                       {ruleText(row.key, rule)}
                     </span>
                   </div>
-                  <div className={`rule-grid ${penalty ? "two" : ""}`}>
+                  <div className="rule-grid">
                     <Field label={penalty ? "Points lost" : "Points"}>
                       {number(`${row.label} points`, Math.abs(rule.points), (n) => setRule(row.key, { points: penalty ? -n : n }))}
                     </Field>
                     <Field label={`For every (${row.unit})`}>
                       {number(`${row.label}: for every`, rule.per, (n) => setRule(row.key, { per: n }), { unit: row.unit, max: 100000, places: 2, min: 0.01 })}
                     </Field>
-                    {!penalty && (
-                      <Field label="Max points">
-                        {number(`${row.label} max points`, rule.max ?? 0, (n) => setRule(row.key, { max: n }))}
-                      </Field>
-                    )}
+                    <Field label={penalty ? "Max lost (0 = none)" : "Max points"}>
+                      {number(`${row.label} max points`, rule.max ?? 0, (n) => setRule(row.key, { max: penalty && n === 0 ? null : n }))}
+                    </Field>
                   </div>
                 </div>
               );
@@ -198,17 +198,6 @@ export function ScoringEditor({ rules, onChange, onReset, onBack, status, error,
                     <Field label="Bonus at 8 hrs">
                       {number("Sleep bonus at 8 hours", rules.sleep.bonus8, (n) => onChange({ ...rules, sleep: { ...rules.sleep, bonus8: n } }))}
                     </Field>
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="row-top">
-                    <span className="row-label">Water</span>
-                    <span className="pill" style={{ background: tint(color), color }}>
-                      +{fmtNum(rules.water)} for the daily glass target
-                    </span>
-                  </div>
-                  <div className="rule-grid">
-                    <Field label="Points">{number("Water points", rules.water, (n) => onChange({ ...rules, water: n }))}</Field>
                   </div>
                 </div>
               </>

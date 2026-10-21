@@ -19,7 +19,7 @@ import {
 import type { League, SaveStatus } from "@/lib/types";
 import { NumberField } from "./NumberField";
 
-type NumericField = Exclude<keyof DayEntry, "meals" | "water">;
+type NumericField = Exclude<keyof DayEntry, "meals" | "exerciseNote">;
 
 interface StepperRow {
   field: NumericField;
@@ -47,9 +47,9 @@ const GROUPS: { id: Group; title: string; color: string; fields: StepperRow[] }[
     title: "Mental",
     color: GROUP_COLORS.mental,
     fields: [
-      { field: "meditationMin", category: "meditation", label: "Meditation", step: 15, max: 600, unit: "min", decimals: false },
       { field: "workHours", category: "work", label: "Work", step: 1, max: 24, unit: "hrs", decimals: true },
       { field: "socialHours", category: "social", label: "Social time", step: 1, max: 24, unit: "hrs", decimals: true },
+      { field: "calls", category: "calls", label: "Calls to family or friends", step: 1, max: 20, unit: "", decimals: false },
       { field: "readingMin", category: "reading", label: "Reading", step: 30, max: 1440, unit: "min", decimals: false },
       { field: "journalMin", category: "journal", label: "Journaling or gratitude", step: 15, max: 600, unit: "min", decimals: false },
     ],
@@ -59,6 +59,7 @@ const GROUPS: { id: Group; title: string; color: string; fields: StepperRow[] }[
     title: "Spiritual",
     color: GROUP_COLORS.spiritual,
     fields: [
+      { field: "meditationMin", category: "meditation", label: "Meditation", step: 15, max: 600, unit: "min", decimals: false },
       { field: "worshipMin", category: "worship", label: "Worship and prayer", step: 15, max: 600, unit: "min", decimals: false },
       { field: "serviceHours", category: "service", label: "Service or volunteering", step: 1, max: 24, unit: "hrs", decimals: true },
     ],
@@ -72,6 +73,7 @@ const GROUPS: { id: Group; title: string; color: string; fields: StepperRow[] }[
       { field: "drinks", category: "drinks", label: "Alcoholic drinks", step: 1, max: 50, unit: "", decimals: false },
       { field: "weed", category: "weed", label: "Weed", step: 1, max: 20, unit: "", decimals: false },
       { field: "cigarettes", category: "cigarettes", label: "Cigarettes", step: 1, max: 100, unit: "", decimals: false },
+      { field: "masturbation", category: "masturbation", label: "Masturbation", step: 1, max: 20, unit: "", decimals: false },
     ],
   },
 ];
@@ -216,9 +218,21 @@ export function DailyLog({
 
           {group.id === "physical" && (
             <>
-              {GROUPS[0].fields.slice(0, 2).map((row) => (
-                <Stepper key={row.field} row={row} group={group.id} entry={entry} score={score} rules={rules} bump={bump} set={set} />
-              ))}
+              <Stepper row={GROUPS[0].fields[0]} group={group.id} entry={entry} score={score} rules={rules} bump={bump} set={set} />
+              <div className="row note-row">
+                <label className="row-sub" htmlFor="exercise-note">
+                  What did you do? League mates can see this.
+                </label>
+                <input
+                  id="exercise-note"
+                  className="note-input"
+                  value={entry.exerciseNote}
+                  maxLength={120}
+                  placeholder="Run, lifting, yoga..."
+                  onChange={(e) => onChange({ ...entry, exerciseNote: e.target.value })}
+                />
+              </div>
+              <Stepper row={GROUPS[0].fields[1]} group={group.id} entry={entry} score={score} rules={rules} bump={bump} set={set} />
               {MEALS.map((name, index) => {
                 const points = mealPoints(entry.meals[index], rules);
                 return (
@@ -247,26 +261,6 @@ export function DailyLog({
                 );
               })}
               <Stepper row={GROUPS[0].fields[2]} group={group.id} entry={entry} score={score} rules={rules} bump={bump} set={set} />
-              <div className="row">
-                <div className="row-top">
-                  <span className="row-label">Water</span>
-                  <span className="pill" style={pillStyle(GROUP_COLORS.physical, entry.water ? 1 : 0)}>{fmtSigned(entry.water ? 1 : 0)}</span>
-                </div>
-                <div className="row-bottom">
-                  <span className="row-sub">+{fmtNum(rules.water)} for the daily glass target</span>
-                  <button
-                    className="switch"
-                    role="switch"
-                    aria-checked={entry.water}
-                    aria-label="Water target met"
-                    onClick={() => onChange({ ...entry, water: !entry.water })}
-                  >
-                    <span className="rail">
-                      <span className="knob" />
-                    </span>
-                  </button>
-                </div>
-              </div>
             </>
           )}
 

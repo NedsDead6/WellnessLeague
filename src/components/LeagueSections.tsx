@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { GROUP_COLORS } from "@/lib/colors";
 import { dayLong, dayOfMonth, dayShortWeekday, periodLabel } from "@/lib/dates";
 import {
@@ -76,10 +76,10 @@ const SHORT: Record<CategoryKey, string> = {
   steps: "Steps",
   meals: "Meals",
   sleep: "Sleep",
-  water: "Water",
   meditation: "Meditation",
   work: "Work",
   social: "Social",
+  calls: "Calls",
   reading: "Reading",
   journal: "Journaling",
   worship: "Worship",
@@ -88,9 +88,25 @@ const SHORT: Record<CategoryKey, string> = {
   drinks: "Drinks",
   weed: "Weed",
   cigarettes: "Cigarettes",
+  masturbation: "Masturbation",
 };
 
 const sign = (n: number) => (n === 0 ? "0" : `${n > 0 ? "+" : "-"}${fmt(round1(Math.abs(n)))}`);
+
+/** The raw numbers behind the points, which league mates can see: steps, exercise minutes and what the exercise was. */
+function detailsFor(m: ScoredMember, picked: string[]) {
+  let steps = 0;
+  let minutes = 0;
+  const notes: string[] = [];
+  for (const d of picked) {
+    const e = m.entries[d];
+    if (!e) continue;
+    steps += e.steps;
+    minutes += e.exerciseMin;
+    if (e.exerciseNote) notes.push(picked.length > 1 ? `${dayShortWeekday(d)}: ${e.exerciseNote}` : e.exerciseNote);
+  }
+  return { steps, minutes, notes };
+}
 
 // ---------------------------------------------------------------- Standings
 
@@ -346,6 +362,8 @@ export function MatchupsSection({ members, reactions, today, weekStart, mode, on
   const right = sel.b;
   const lt = totalsFor(left, picked);
   const rt = right ? totalsFor(right, picked) : null;
+  const dl = detailsFor(left, picked);
+  const dr = right ? detailsFor(right, picked) : dl;
   const recordText = (id: string) => {
     const r = records[id];
     return `${r.wins}-${r.losses}${r.ties > 0 ? `-${r.ties}` : ""}`;
@@ -475,6 +493,28 @@ export function MatchupsSection({ members, reactions, today, weekStart, mode, on
                 <span className={rt.bonuses > lt.bonuses ? "win" : ""}>{sign(rt.bonuses)}</span>
               </div>
             )}
+            <div className="duel-row group details-head">
+              <span />
+              <span>Details</span>
+              <span />
+            </div>
+            <div className="duel-row">
+              <span>{dl.steps.toLocaleString("en-US")}</span>
+              <span>Steps</span>
+              <span>{dr.steps.toLocaleString("en-US")}</span>
+            </div>
+            <div className="duel-row">
+              <span>{dl.minutes} min</span>
+              <span>Exercise</span>
+              <span>{dr.minutes} min</span>
+            </div>
+            <div className="duel-notes" aria-label="What they did for exercise">
+              {[dl, dr].map((d, i) => (
+                <ul key={i}>
+                  {d.notes.length === 0 ? <li className="none">No exercise notes</li> : d.notes.map((n, k) => <li key={k}>{n}</li>)}
+                </ul>
+              ))}
+            </div>
             <div className="duel-row total">
               <span className={lt.total > rt.total ? "win" : ""}>{fmt(round1(lt.total))}</span>
               <span>Total</span>
@@ -527,25 +567,101 @@ export function GoalsSection({ challenges, members, weekStart }: { challenges: C
   );
 }
 
-export function FeedSection({ items }: { items: FeedItem[] }) {
+const POST_EMOJIS = ["🔥", "💪", "👏", "🙌", "🎉", "😂", "❤️", "🏃", "🧘", "😴", "🥗", "👟"];
+
+export function FeedSection({
+  items,
+  onPost,
+  onDelete,
+}: {
+  items: FeedItem[];
+  onPost: (body: string) => Promise<string | null>;
+  onDelete: (id: string) => void;
+}) {
   const [all, setAll] = useState(false);
-  if (items.length === 0) return <p className="callout">Nothing yet. Highlights and reactions from the last two weeks show up here.</p>;
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const shown = all ? items : items.slice(0, 12);
   const now = new Date();
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!text.trim()) return;
+    setBusy(true);
+    const failed = await onPost(text);
+    setBusy(false);
+    if (failed) setMessage(failed.includes("league_posts") ? "Posting isn't set up yet. Run the latest SQL file in Supabase." : failed);
+    else {
+      setText("");
+      setMessage(null);
+    }
+  };
+
   return (
     <>
-      <ul className="feed">
-        {shown.map((item) => (
-          <li key={item.key}>
-            <span>{item.text}</span>
-            {item.exact && (
-              <time className="feed-time" dateTime={item.at}>
-                {formatWhen(item.at, now)}
-              </time>
-            )}
-          </li>
-        ))}
-      </ul>
+      <form className="composer" onSubmit={submit}>
+        <label className="sr-only" htmlFor="feed-post">
+          Write something to the league
+        </label>
+        <textarea
+          id="feed-post"
+          className="text-input"
+          rows={2}
+          maxLength={280}
+          value={text}
+          placeholder="Say something to the league..."
+          onChange={(e) => setText(e.target.value)}
+        />
+        <div className="composer-bar">
+          <div className="emoji-strip" role="group" aria-label="Add an emoji">
+            {POST_EMOJIS.map((emoji) => (
+              <button key={emoji} type="button" className="emoji-chip pick" aria-label={`Add ${emoji}`} onClick={() => setText((t) => (t + emoji).slice(0, 280))}>
+                {emoji}
+              </button>
+            ))}
+          </div>
+          <button className="primary" type="submit" disabled={busy || !text.trim()}>
+            {busy ? "Posting..." : "Post"}
+          </button>
+        </div>
+        {message && (
+          <p className="form-message" role="status">
+            {message}
+          </p>
+        )}
+      </form>
+
+      {items.length === 0 ? (
+        <p className="callout">Nothing yet. Highlights and posts from the last two weeks show up here.</p>
+      ) : (
+        <ul className="feed">
+          {shown.map((item) => (
+            <li key={item.key} className={item.post ? "post" : undefined}>
+              {item.post ? (
+                <>
+                  <span className="post-head">
+                    <strong>{item.post.name}</strong>
+                    {item.post.mine && (
+                      <button type="button" className="text-button" aria-label="Delete your post" onClick={() => onDelete(item.post!.id)}>
+                        Delete
+                      </button>
+                    )}
+                  </span>
+                  <span className="post-body">{item.post.body}</span>
+                </>
+              ) : (
+                <span>{item.text}</span>
+              )}
+              {item.exact && (
+                <time className="feed-time" dateTime={item.at}>
+                  {formatWhen(item.at, now)}
+                </time>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
       {items.length > 12 && !all && (
         <button className="text-button" onClick={() => setAll(true)}>
           Show {items.length - 12} more
