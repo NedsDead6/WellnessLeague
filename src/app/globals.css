@@ -1417,7 +1417,9 @@ button:focus-visible {
 
 /* League sections: recap, matchups, goals, feed, reactions */
 .sections button {
-  font-size: 13.5px;
+  font-size: 13px;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 .leaders {
@@ -1464,11 +1466,15 @@ button:focus-visible {
 }
 
 .award-title {
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   color: var(--spiritual);
+}
+
+.award-emoji {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .award strong {
@@ -2063,14 +2069,18 @@ button:focus-visible {
 }
 
 .award-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+  display: block;
 }
 
 .award-star {
   color: var(--spiritual);
-  flex: none;
+  margin-left: 5px;
+  vertical-align: -2px;
+}
+
+.award-emoji {
+  margin-left: 5px;
+  white-space: nowrap;
 }
 
 /* Avatars, photo upload, emoji pickers */

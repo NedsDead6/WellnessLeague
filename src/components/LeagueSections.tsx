@@ -135,7 +135,6 @@ export function StandingsSection({
   const played = table.some((m) => records[m.id].wins + records[m.id].losses + records[m.id].ties > 0);
   const live = weekStart >= currentWeek;
   const matchups = weekMatchups(members, weekStart).sort((x, y) => Number(y.a.you || !!y.b?.you) - Number(x.a.you || !!x.b?.you));
-  const awards = weeklyAwards(members, weekStart);
   const stats = seasonStats(members);
   const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? "Someone";
 
@@ -155,6 +154,36 @@ export function StandingsSection({
 
   return (
     <>
+      <section aria-label="Matchup scores">
+        <div className="group-head">
+          <span className="name">{live ? "This week's matchups" : "Matchups that week"}</span>
+        </div>
+        {matchups.length === 0 ? (
+          <p className="callout">Matchups start when a second person joins the league.</p>
+        ) : (
+          matchups.map((m) => {
+            const aLead = m.aPoints > m.bPoints;
+            const tie = m.aPoints === m.bPoints;
+            return m.b ? (
+              <button className="score-row" key={m.a.id} onClick={() => onOpenMatchup(m.a.id)} aria-label={`Open ${m.a.name} versus ${m.b.name}`}>
+                <span className={`score-name ${aLead ? "lead" : ""}`}>{m.a.name}</span>
+                <strong className={aLead ? "lead" : ""}>{fmt(round1(m.aPoints))}</strong>
+                <span className="score-sep">{live ? "live" : "final"}</span>
+                <strong className={!aLead && !tie ? "lead" : ""}>{fmt(round1(m.bPoints))}</strong>
+                <span className={`score-name right ${!aLead && !tie ? "lead" : ""}`}>{m.b.name}</span>
+              </button>
+            ) : (
+              <button className="score-row bye" key={m.a.id} onClick={() => onOpenMatchup(m.a.id)} aria-label={`Open ${m.a.name}, rest week`}>
+                <span className="score-name lead">{m.a.name}</span>
+                <span className="score-sep wide">
+                  rest week <strong className="lead">{fmt(round1(m.aPoints))}</strong>
+                </span>
+              </button>
+            );
+          })
+        )}
+      </section>
+
       <section aria-label="League table">
         <div className="group-head">
           <span className="name">League table</span>
@@ -194,60 +223,12 @@ export function StandingsSection({
         </p>
       </section>
 
-      <section aria-label="Matchup scores">
+      <section aria-label="Season points by member">
         <div className="group-head">
-          <span className="name">{live ? "This week's matchups" : "Matchups that week"}</span>
+          <span className="name">Season points by member</span>
+          <span className="sum">since the league started</span>
         </div>
-        {matchups.length === 0 ? (
-          <p className="callout">Matchups start when a second person joins the league.</p>
-        ) : (
-          matchups.map((m) => {
-            const aLead = m.aPoints > m.bPoints;
-            const tie = m.aPoints === m.bPoints;
-            return m.b ? (
-              <button className="score-row" key={m.a.id} onClick={() => onOpenMatchup(m.a.id)} aria-label={`Open ${m.a.name} versus ${m.b.name}`}>
-                <span className={`score-name ${aLead ? "lead" : ""}`}>{m.a.name}</span>
-                <strong className={aLead ? "lead" : ""}>{fmt(round1(m.aPoints))}</strong>
-                <span className="score-sep">{live ? "live" : "final"}</span>
-                <strong className={!aLead && !tie ? "lead" : ""}>{fmt(round1(m.bPoints))}</strong>
-                <span className={`score-name right ${!aLead && !tie ? "lead" : ""}`}>{m.b.name}</span>
-              </button>
-            ) : (
-              <button className="score-row bye" key={m.a.id} onClick={() => onOpenMatchup(m.a.id)} aria-label={`Open ${m.a.name}, rest week`}>
-                <span className="score-name lead">{m.a.name}</span>
-                <span className="score-sep wide">
-                  rest week <strong className="lead">{fmt(round1(m.aPoints))}</strong>
-                </span>
-              </button>
-            );
-          })
-        )}
-      </section>
-
-      <section aria-label="Weekly recap">
-        <div className="group-head">
-          <span className="name">Weekly recap</span>
-        </div>
-        {awards.length === 0 ? (
-          <p className="callout">No awards yet. They appear once members share days this week.</p>
-        ) : (
-          <div className="awards">
-            {awards.map((a) => (
-              <div className="award" key={a.key}>
-                <span className="award-title">
-                  {a.key === "mvp" && (
-                    <svg className="award-star" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
-                      <path fill="currentColor" d="M12 2.5l2.95 6.1 6.65.9-4.85 4.65 1.2 6.6L12 17.5l-5.95 3.25 1.2-6.6L2.4 9.5l6.65-.9z" />
-                    </svg>
-                  )}
-                  {a.title}
-                </span>
-                <strong>{nameOf(a.memberId)}</strong>
-                <span className="award-detail">{a.detail}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <StackedChart bars={bars} emptyText="Nothing shared" ariaLabel="Season points by member, split by category" />
       </section>
 
       <section aria-label="Season stats">
@@ -263,10 +244,6 @@ export function StandingsSection({
           <SeasonCard label="Most days shared" who={stats.mostConsistent && nameOf(stats.mostConsistent.memberId)} detail={stats.mostConsistent && `${stats.mostConsistent.days} days`} />
           <SeasonCard label="League totals" who={stats.totalPoints > 0 ? `${Math.round(stats.totalPoints).toLocaleString("en-US")} pts` : null} detail={stats.totalSteps > 0 ? `${stats.totalSteps.toLocaleString("en-US")} steps walked` : null} />
         </div>
-        <div className="group-head sub">
-          <span className="name">Season points by member</span>
-        </div>
-        <StackedChart bars={bars} emptyText="Nothing shared" ariaLabel="Season points by member, split by category" />
       </section>
     </>
   );
@@ -281,6 +258,65 @@ function SeasonCard({ label, who, detail }: { label: string; who: string | null 
     </div>
   );
 }
+
+// ---------------------------------------------------------------- Weekly awards
+
+const AWARD_STYLE: Record<string, { emoji: string; color: string }> = {
+  mvp: { emoji: "", color: "#ffd23d" },
+  improved: { emoji: "📈", color: "#5ee0ff" },
+  balanced: { emoji: "⚖️", color: "#e6eeff" },
+  physical: { emoji: "💪", color: GROUP_COLORS.physical },
+  mental: { emoji: "🧠", color: GROUP_COLORS.mental },
+  spiritual: { emoji: "🙏", color: GROUP_COLORS.spiritual },
+  grinder: { emoji: "💼", color: GROUP_COLORS.mental },
+  steps: { emoji: "👟", color: GROUP_COLORS.physical },
+  exercise: { emoji: "🏋️", color: GROUP_COLORS.physical },
+  clean: { emoji: "😇", color: GROUP_COLORS.penalty },
+  eater: { emoji: "🥗", color: GROUP_COLORS.physical },
+  social: { emoji: "🦋", color: GROUP_COLORS.mental },
+};
+
+export function AwardsSection({ members, weekStart }: { members: ScoredMember[]; weekStart: string }) {
+  const awards = weeklyAwards(members, weekStart);
+  return (
+    <section aria-label="Weekly awards">
+      <div className="group-head">
+        <span className="name">Weekly Awards</span>
+        <span className="sum">{periodLabel(weekStart, "week")}</span>
+      </div>
+      {awards.length === 0 ? (
+        <p className="callout">No awards yet. They appear once members share days this week.</p>
+      ) : (
+        <div className="awards">
+          {awards.map((a) => {
+            const style = AWARD_STYLE[a.key] ?? { emoji: "", color: "#ffd23d" };
+            return (
+              <div className="award" key={a.key}>
+                <span className="award-title" style={{ color: style.color }}>
+                  {a.title}
+                  {a.key === "mvp" ? (
+                    <svg className="award-star" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+                      <path fill="currentColor" d="M12 2.5l2.95 6.1 6.65.9-4.85 4.65 1.2 6.6L12 17.5l-5.95 3.25 1.2-6.6L2.4 9.5l6.65-.9z" />
+                    </svg>
+                  ) : (
+                    style.emoji && (
+                      <span className="award-emoji" aria-hidden="true">
+                        {style.emoji}
+                      </span>
+                    )
+                  )}
+                </span>
+                <strong>{nameOf(members, a.memberId)}</strong>
+                <span className="award-detail">{a.detail}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 
 // ---------------------------------------------------------------- Matchups
 
