@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   challengeProgress,
   feedItems,
+  formatWhen,
+  seasonStats,
   matchupRecords,
   pairings,
   pillarLeaders,
@@ -68,10 +70,10 @@ describe("matchups and records", () => {
 
   it("keeps a win-loss record over completed weeks only", () => {
     const records = matchupRecords(members, W2);
-    expect(records.a).toEqual({ wins: 1, losses: 0, ties: 0 });
-    expect(records.b).toEqual({ wins: 0, losses: 1, ties: 0 });
+    expect(records.a).toEqual({ wins: 1, losses: 0, ties: 0, pointsFor: 10, pointsAgainst: 2 });
+    expect(records.b).toEqual({ wins: 0, losses: 1, ties: 0, pointsFor: 2, pointsAgainst: 10 });
     const later = matchupRecords(members, "2026-10-26");
-    expect(later.a).toEqual({ wins: 1, losses: 1, ties: 0 });
+    expect(later.a).toEqual({ wins: 1, losses: 1, ties: 0, pointsFor: 11, pointsAgainst: 12 });
   });
 });
 
@@ -152,12 +154,56 @@ describe("activity feed", () => {
     expect(items.some((i) => i.text.includes("B walked 16,000 steps"))).toBe(true);
     expect(items.some((i) => i.text.includes("You walked 12,000 steps"))).toBe(true);
     expect(items.some((i) => i.text === "B joined the league")).toBe(true);
-    const whens = items.map((i) => i.when);
-    expect([...whens].sort().reverse()).toEqual(whens);
+    const times = items.map((i) => Date.parse(i.at));
+    expect([...times].sort((x, y) => y - x)).toEqual(times);
   });
 
   it("skips anything older than two weeks", () => {
     const old = scored([member("a", { "2026-09-01": { steps: 20000 } })]);
     expect(feedItems(old, [], [], "2026-10-21")).toEqual([]);
+  });
+});
+
+describe("season stats", () => {
+  const members = scored([
+    member("a", { "2026-10-12": { steps: 8000 }, "2026-10-13": { steps: 8000 }, "2026-10-14": { steps: 8000 }, "2026-10-19": { steps: 40000 } }),
+    member("b", { "2026-10-12": { steps: 4000 }, "2026-10-20": { steps: 4000 } }),
+  ]);
+
+  it("finds the best week, day, average, streak and consistency", () => {
+    const s = seasonStats(members);
+    expect(s.bestWeek).toEqual({ memberId: "a", points: 10, weekStart: "2026-10-19" });
+    expect(s.bestDay).toEqual({ memberId: "a", points: 10, day: "2026-10-19" });
+    expect(s.topAverage?.memberId).toBe("a"); // b has fewer than 3 days
+    expect(s.longestStreak).toEqual({ memberId: "a", days: 3 });
+    expect(s.mostConsistent).toEqual({ memberId: "a", days: 4 });
+    expect(s.totalSteps).toBe(8000 * 3 + 40000 + 8000);
+    expect(s.totalPoints).toBe(2 * 3 + 10 + 2);
+  });
+
+  it("is empty with nothing shared", () => {
+    expect(seasonStats(scored([member("a", {})])).bestDay).toBeNull();
+  });
+});
+
+describe("feed times", () => {
+  const now = new Date(2026, 9, 21, 20, 30);
+  const at = (d: number, h: number, m: number) => new Date(2026, 9, d, h, m).toISOString();
+  it("describes recent and older times", () => {
+    expect(formatWhen(at(21, 20, 30), now)).toBe("Just now");
+    expect(formatWhen(at(21, 20, 5), now)).toBe("25 min ago");
+    expect(formatWhen(at(21, 9, 5), now)).toBe("Today, 9:05 AM");
+    expect(formatWhen(at(20, 21, 0), now)).toBe("Yesterday, 9:00 PM");
+    expect(formatWhen(at(17, 8, 15), now)).toBe("Sat, 8:15 AM");
+    expect(formatWhen(at(8, 8, 15), now)).toBe("Oct 8, 8:15 AM");
+    expect(formatWhen("nonsense", now)).toBe("");
+  });
+
+  it("uses the time a day was saved and marks days without one as approximate", () => {
+    const m = scoreMember({ ...member("a", { "2026-10-20": { steps: 12000 } }), updatedAt: { "2026-10-20": "2026-10-20T19:45:00Z" } }, DEFAULT_RULES);
+    const n = scoreMember(member("b", { "2026-10-20": { steps: 12000 } }), DEFAULT_RULES);
+    const items = feedItems([m, n], [], [], "2026-10-21");
+    expect(items.find((i) => i.text.startsWith("A"))).toMatchObject({ at: "2026-10-20T19:45:00Z", exact: true });
+    expect(items.find((i) => i.text.startsWith("B"))?.exact).toBe(false);
   });
 });

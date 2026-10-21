@@ -17,6 +17,7 @@ const SAVE_DELAY_MS = 700;
 export function useEntries(userId: string | undefined) {
   const [entries, setEntries] = useState<EntryMap>({});
   const [shared, setShared] = useState<Record<string, string[]>>({});
+  const [updatedAt, setUpdatedAt] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(!supabase);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export function useEntries(userId: string | undefined) {
     sharedRef.current = {};
     setEntries({});
     setShared({});
+    setUpdatedAt({});
     setError(null);
     setStatus("idle");
     if (!supabase || !userId) {
@@ -42,7 +44,7 @@ export function useEntries(userId: string | undefined) {
     (async () => {
       try {
         const entryRows = await fetchAll((from, to) =>
-          client.from("daily_entries").select("day, entry").eq("user_id", userId).order("day").range(from, to),
+          client.from("daily_entries").select("day, entry, updated_at").eq("user_id", userId).order("day").range(from, to),
         );
         const shareRows = await fetchAll((from, to) =>
           client.from("entry_leagues").select("day, league_id").eq("user_id", userId).order("day").range(from, to),
@@ -50,6 +52,9 @@ export function useEntries(userId: string | undefined) {
         if (cancelled) return;
         const entryMap: EntryMap = {};
         for (const row of entryRows) entryMap[row.day as string] = normalizeEntry(row.entry);
+        const stamps: Record<string, string> = {};
+        for (const row of entryRows) if (row.updated_at) stamps[row.day as string] = row.updated_at as string;
+        setUpdatedAt(stamps);
         const shareMap: Record<string, string[]> = {};
         for (const row of shareRows) (shareMap[row.day as string] ??= []).push(row.league_id as string);
         entriesRef.current = entryMap;
@@ -109,6 +114,7 @@ export function useEntries(userId: string | undefined) {
       sharedRef.current = { ...sharedRef.current, [day]: leagueIds };
       setEntries(entriesRef.current);
       setShared(sharedRef.current);
+      setUpdatedAt((all) => ({ ...all, [day]: new Date().toISOString() }));
       if (!supabase || !userId) return;
       setStatus("saving");
       const pending = timers.current.get(day);
@@ -142,5 +148,5 @@ export function useEntries(userId: string | undefined) {
     };
   }, [persist]);
 
-  return { entries, shared, loaded, status, error, save };
+  return { entries, shared, updatedAt, loaded, status, error, save };
 }

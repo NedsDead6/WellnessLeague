@@ -13,6 +13,8 @@ export interface OtherMember {
   joinedAt: string;
   /** Days this person shared with the league. */
   entries: Record<string, DayEntry>;
+  /** When each shared day was last saved. */
+  updatedAt: Record<string, string>;
 }
 
 /**
@@ -59,11 +61,12 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
       const firstDay = shares.filter((row) => otherIds.has(row.user_id)).map((row) => row.day as string).sort()[0];
 
       const byUser = new Map<string, Record<string, DayEntry>>();
+      const stamps = new Map<string, Record<string, string>>();
       if (others.length > 0 && firstDay) {
         const rows = await fetchAll((from, to) =>
           client
             .from("daily_entries")
-            .select("user_id, day, entry")
+            .select("user_id, day, entry, updated_at")
             .in(
               "user_id",
               others.map((m) => m.id),
@@ -77,6 +80,7 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
           const days = byUser.get(row.user_id) ?? {};
           days[row.day as string] = normalizeEntry(row.entry);
           byUser.set(row.user_id, days);
+          if (row.updated_at) stamps.set(row.user_id, { ...(stamps.get(row.user_id) ?? {}), [row.day as string]: row.updated_at as string });
         }
       }
 
@@ -86,7 +90,7 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
       const challengeRows = await client.from("league_challenges").select("id, metric, target, week_start").eq("league_id", leagueId);
       if (challengeRows.error) throw new Error(challengeRows.error.message);
 
-      setOthers(others.map((m) => ({ ...m, entries: byUser.get(m.id) ?? {} })));
+      setOthers(others.map((m) => ({ ...m, entries: byUser.get(m.id) ?? {}, updatedAt: stamps.get(m.id) ?? {} })));
       setReactions(reactionRows as Reaction[]);
       setChallenges(((challengeRows.data ?? []) as any[]).map((c) => ({ ...c, target: Number(c.target) })) as Challenge[]);
       setError(null);

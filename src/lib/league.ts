@@ -13,6 +13,8 @@ export interface LeagueMember {
   you: boolean;
   /** Days this person shared with the league, by day. */
   entries: Record<string, DayEntry>;
+  /** When each of those days was last saved (ISO time), where known. */
+  updatedAt?: Record<string, string>;
 }
 
 export interface ScoredMember extends LeagueMember {
@@ -118,11 +120,13 @@ export interface Record3 {
   wins: number;
   losses: number;
   ties: number;
+  pointsFor: number;
+  pointsAgainst: number;
 }
 
 /** Win-loss-tie record for every member over the completed weeks before `before`. */
 export function matchupRecords(members: ScoredMember[], before: string): Record<string, Record3> {
-  const records: Record<string, Record3> = Object.fromEntries(members.map((m) => [m.id, { wins: 0, losses: 0, ties: 0 }]));
+  const records: Record<string, Record3> = Object.fromEntries(members.map((m) => [m.id, { wins: 0, losses: 0, ties: 0, pointsFor: 0, pointsAgainst: 0 }]));
   const start = firstWeek(members);
   if (start === null) return records;
   for (const week of weeksFrom(start, addDays(before, -7))) {
@@ -130,6 +134,10 @@ export function matchupRecords(members: ScoredMember[], before: string): Record<
       if (!m.b) continue;
       // A week where neither person shared anything isn't a result.
       if (totalsFor(m.a, weekDays(week)).shared + totalsFor(m.b, weekDays(week)).shared === 0) continue;
+      records[m.a.id].pointsFor += m.aPoints;
+      records[m.a.id].pointsAgainst += m.bPoints;
+      records[m.b.id].pointsFor += m.bPoints;
+      records[m.b.id].pointsAgainst += m.aPoints;
       if (m.aPoints > m.bPoints) {
         records[m.a.id].wins += 1;
         records[m.b.id].losses += 1;
@@ -141,6 +149,10 @@ export function matchupRecords(members: ScoredMember[], before: string): Record<
         records[m.b.id].ties += 1;
       }
     }
+  }
+  for (const r of Object.values(records)) {
+    r.pointsFor = Math.round(r.pointsFor * 100) / 100;
+    r.pointsAgainst = Math.round(r.pointsAgainst * 100) / 100;
   }
   return records;
 }
@@ -213,6 +225,59 @@ export function pillarLeaders(members: ScoredMember[], days: string[]) {
   });
 }
 
+// ---- Season-wide stats ----
+
+export interface SeasonStats {
+  bestWeek: { memberId: string; points: number; weekStart: string } | null;
+  bestDay: { memberId: string; points: number; day: string } | null;
+  topAverage: { memberId: string; average: number; days: number } | null;
+  longestStreak: { memberId: string; days: number } | null;
+  mostConsistent: { memberId: string; days: number } | null;
+  totalPoints: number;
+  totalSteps: number;
+}
+
+/** Longest run of back-to-back shared days. */
+function longestRun(days: string[]): number {
+  const sorted = [...days].sort();
+  let best = 0;
+  let run = 0;
+  sorted.forEach((day, i) => {
+    run = i > 0 && diffDays(day, sorted[i - 1]) === 1 ? run + 1 : 1;
+    best = Math.max(best, run);
+  });
+  return best;
+}
+
+export function seasonStats(members: ScoredMember[]): SeasonStats {
+  const stats: SeasonStats = { bestWeek: null, bestDay: null, topAverage: null, longestStreak: null, mostConsistent: null, totalPoints: 0, totalSteps: 0 };
+  for (const m of members) {
+    const days = Object.keys(m.scores);
+    const byWeek = new Map<string, number>();
+    let total = 0;
+    for (const day of days) {
+      const points = m.scores[day].total;
+      total += points;
+      stats.totalSteps += m.entries[day].steps;
+      byWeek.set(weekOf(day), (byWeek.get(weekOf(day)) ?? 0) + points);
+      if (!stats.bestDay || points > stats.bestDay.points) stats.bestDay = { memberId: m.id, points, day };
+    }
+    stats.totalPoints += total;
+    for (const [weekStart, points] of byWeek) {
+      if (!stats.bestWeek || points > stats.bestWeek.points) stats.bestWeek = { memberId: m.id, points, weekStart };
+    }
+    if (days.length >= 3) {
+      const average = total / days.length;
+      if (!stats.topAverage || average > stats.topAverage.average) stats.topAverage = { memberId: m.id, average, days: days.length };
+    }
+    const run = longestRun(days);
+    if (run > 0 && (!stats.longestStreak || run > stats.longestStreak.days)) stats.longestStreak = { memberId: m.id, days: run };
+    if (days.length > 0 && (!stats.mostConsistent || days.length > stats.mostConsistent.days)) stats.mostConsistent = { memberId: m.id, days: days.length };
+  }
+  stats.totalPoints = Math.round(stats.totalPoints * 10) / 10;
+  return stats;
+}
+
 // ---- Team challenges ----
 
 export const CHALLENGE_METRICS = [
@@ -271,9 +336,27 @@ export interface Reaction {
 
 export interface FeedItem {
   key: string;
-  /** ISO-ish string used only to sort newest first. */
-  when: string;
+  /** When it happened (ISO time), used to sort newest first. */
+  at: string;
+  /** False when only the day is known, so no clock time is shown. */
+  exact: boolean;
   text: string;
+}
+
+/** A friendly time for the feed: "12 min ago", "Today, 8:05 PM", "Tue, 8:05 PM" or "Oct 12, 8:05 PM". */
+export function formatWhen(iso: string, now: Date = new Date()): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(now) - startOf(d)) / 86400000);
+  const mins = Math.floor((now.getTime() - d.getTime()) / 60000);
+  if (mins >= 0 && mins < 1) return "Just now";
+  if (mins >= 0 && mins < 60) return `${mins} min ago`;
+  if (days === 0) return `Today, ${time}`;
+  if (days === 1) return `Yesterday, ${time}`;
+  if (days > 1 && days < 7) return `${d.toLocaleDateString("en-US", { weekday: "short" })}, ${time}`;
+  return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${time}`;
 }
 
 /** Highlights from the last two weeks of shared days, plus reactions and joins. */
@@ -300,7 +383,13 @@ export function feedItems(
       if (entry.readingMin >= 60) found.push(`read for ${entry.readingMin} min`);
       if (entry.meditationMin >= 30) found.push(`meditated for ${entry.meditationMin} min`);
       for (const what of found.slice(0, 2)) {
-        items.push({ key: `${m.id}-${day}-${what}`, when: `${day}T12`, text: `${label(m.id)} ${what} (${day === today ? "today" : dayLong(day)})` });
+        const saved = m.updatedAt?.[day];
+        items.push({
+          key: `${m.id}-${day}-${what}`,
+          at: saved ?? `${day}T12:00:00`,
+          exact: Boolean(saved),
+          text: `${label(m.id)} ${what} (${day === today ? "today" : dayLong(day)})`,
+        });
       }
     }
   }
@@ -309,15 +398,16 @@ export function feedItems(
     if (r.day < oldest) continue;
     items.push({
       key: `r-${r.reactor_id}-${r.target_user_id}-${r.day}-${r.emoji}`,
-      when: r.created_at ?? `${r.day}T13`,
+      at: r.created_at ?? `${r.day}T13:00:00`,
+      exact: Boolean(r.created_at),
       text: `${label(r.reactor_id)} ${r.emoji} ${r.target_user_id === r.reactor_id ? verb(r.reactor_id, "your own", "their own") : `${label(r.target_user_id)}${nameOf(r.target_user_id)?.you ? "r" : "'s"}`} ${dayLong(r.day).split(",")[0]}`,
     });
   }
 
   for (const j of joins) {
     if (j.joinedAt.slice(0, 10) < oldest) continue;
-    items.push({ key: `j-${j.userId}`, when: j.joinedAt, text: `${label(j.userId)} ${verb(j.userId, "joined", "joined")} the league` });
+    items.push({ key: `j-${j.userId}`, at: j.joinedAt, exact: true, text: `${label(j.userId)} ${verb(j.userId, "joined", "joined")} the league` });
   }
 
-  return items.sort((a, b) => (a.when < b.when ? 1 : a.when > b.when ? -1 : 0));
+  return items.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 }

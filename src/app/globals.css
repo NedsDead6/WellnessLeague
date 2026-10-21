@@ -1609,3 +1609,276 @@ button:focus-visible {
   font: inherit;
   font-size: 14px;
 }
+
+/* Standings table, score rows, season stats */
+.table {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 56px 52px 52px;
+  align-items: center;
+  gap: 4px;
+  padding: 11px 12px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  border-top: 1px solid var(--line);
+}
+
+.table-row:first-child {
+  border-top: 0;
+}
+
+.table-row > span:nth-child(n + 3) {
+  text-align: right;
+}
+
+.table-row.head {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--well);
+}
+
+.table-row.you {
+  background: var(--physical-tint);
+}
+
+.table-name {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-rec {
+  font-weight: 700;
+}
+
+.score-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto auto auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.score-row.bye {
+  grid-template-columns: 1fr auto;
+  cursor: default;
+}
+
+.score-row strong {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.score-row strong.lead,
+.score-name.lead {
+  color: var(--ink);
+}
+
+.score-row strong.lead {
+  color: var(--physical);
+}
+
+.score-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-name.right {
+  text-align: right;
+}
+
+.score-sep {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.score-sep.wide {
+  font-size: 12px;
+}
+
+.season-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stat-value.small {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.group-head.sub {
+  margin-top: 8px;
+}
+
+/* Matchup: two-column scoreboard like a fantasy app */
+.duel-board {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.duel-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 8px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  text-align: center;
+  min-width: 0;
+}
+
+.duel-side.lead {
+  border-color: var(--physical);
+  background: var(--physical-tint);
+}
+
+.duel-name {
+  font-weight: 600;
+  font-size: 15px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duel-rec,
+.duel-days {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.duel-score {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 34px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.duel-side .react-row {
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.duel-table {
+  margin-top: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  overflow: hidden;
+}
+
+.duel-row {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  align-items: center;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  border-top: 1px solid var(--line);
+}
+
+.duel-row > span:first-child {
+  text-align: left;
+}
+
+.duel-row > span:nth-child(2) {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.duel-row > span:last-child {
+  text-align: right;
+}
+
+.duel-row .win {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.duel-row > span:not(.win):not(:nth-child(2)) {
+  color: var(--muted);
+}
+
+.duel-row.names {
+  border-top: 0;
+  background: var(--well);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.duel-row.names span {
+  color: var(--ink) !important;
+}
+
+.duel-row.group {
+  background: var(--well);
+  font-weight: 700;
+}
+
+.duel-row.group > span:nth-child(2) {
+  color: inherit;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.duel-row.total {
+  font-weight: 700;
+  font-size: 16px;
+  border-top: 2px solid var(--line-strong);
+}
+
+.duel-row.total > span:nth-child(2) {
+  color: var(--ink);
+}
+
+/* Feed timestamps */
+.feed li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.feed-time {
+  font-size: 12px;
+  color: var(--muted);
+}

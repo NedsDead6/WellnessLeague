@@ -51,7 +51,7 @@ export function App() {
   const { session, ready } = useSession();
   const userId = session?.user.id;
   const { leagues, reload: reloadLeagues } = useLeagues(userId);
-  const { entries, shared, loaded, status, error, save } = useEntries(userId);
+  const { entries, shared, updatedAt, loaded, status, error, save } = useEntries(userId);
   const scoring = useScoringRules(userId);
   const rules = scoring.rules;
 
@@ -159,6 +159,7 @@ export function App() {
             onLeaguesChanged={reloadLeagues}
             entries={entries}
             shared={shared}
+            updatedAt={updatedAt}
             today={today}
           />
         )}

@@ -36,10 +36,11 @@ interface Props {
   onLeaguesChanged: () => void | Promise<void>;
   entries: EntryMap;
   shared: Record<string, string[]>;
+  updatedAt: Record<string, string>;
   today: string;
 }
 
-export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared, today }: Props) {
+export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared, updatedAt, today }: Props) {
   const userId = session?.user.id;
   const [chosen, setChosen] = useState<string | null>(() => (typeof window === "undefined" ? null : rememberedLeague()));
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -101,6 +102,7 @@ export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared
           today={today}
           entries={entries}
           shared={shared}
+          updatedAt={updatedAt}
           showName={leagues.length === 1}
           settingsOpen={settingsOpen && selected.owner_id === userId}
           onCloseSettings={() => setSettingsOpen(false)}
@@ -125,6 +127,7 @@ function LeagueView({
   today,
   entries,
   shared,
+  updatedAt,
   showName,
   settingsOpen,
   onCloseSettings,
@@ -135,6 +138,7 @@ function LeagueView({
   today: string;
   entries: EntryMap;
   shared: Record<string, string[]>;
+  updatedAt: Record<string, string>;
   showName: boolean;
   settingsOpen: boolean;
   onCloseSettings: () => void;
@@ -147,6 +151,7 @@ function LeagueView({
   const [mode, setMode] = useState<Mode>("day");
   const [offset, setOffset] = useState(0);
   const [dayIdx, setDayIdx] = useState(() => weekdayIndex(today));
+  const [pairId, setPairId] = useState<string | null>(null);
 
   // Your own shared days come from this device so changes show instantly.
   const members = useMemo(() => {
@@ -155,10 +160,11 @@ function LeagueView({
       name: "You",
       you: true,
       entries: Object.fromEntries(Object.entries(entries).filter(([day]) => (shared[day] ?? []).includes(league.id))),
+      updatedAt: Object.fromEntries(Object.entries(updatedAt).filter(([day]) => (shared[day] ?? []).includes(league.id))),
     };
-    const others: LeagueMember[] = data.others.map((o) => ({ id: o.id, name: o.name, you: false, entries: o.entries }));
+    const others: LeagueMember[] = data.others.map((o) => ({ id: o.id, name: o.name, you: false, entries: o.entries, updatedAt: o.updatedAt }));
     return [...others, mine].map((m) => scoreMember(m, rules));
-  }, [data.others, entries, shared, league.id, userId, rules]);
+  }, [data.others, entries, shared, updatedAt, league.id, userId, rules]);
 
   const currentWeek = weekOf(today);
   const weekStart = addDays(currentWeek, offset * 7);
@@ -182,7 +188,8 @@ function LeagueView({
     );
   }
 
-  const usesWeek = section !== "feed" && !(section === "standings" && mode === "season");
+  const usesWeek = section !== "feed";
+  const shownDay = Math.min(dayIdx, offset === 0 ? weekdayIndex(today) : 6);
 
   return (
     <section aria-label={`${league.name}`}>
@@ -217,19 +224,30 @@ function LeagueView({
       {section === "standings" && (
         <StandingsSection
           members={members}
+          today={today}
+          weekStart={weekStart}
+          onOpenMatchup={(id) => {
+            setPairId(id);
+            setSection("matchups");
+          }}
+        />
+      )}
+      {section === "matchups" && (
+        <MatchupsSection
+          members={members}
           reactions={data.reactions}
           today={today}
           weekStart={weekStart}
           mode={mode}
           onMode={setMode}
-          dayIdx={Math.min(dayIdx, offset === 0 ? weekdayIndex(today) : 6)}
+          dayIdx={shownDay}
           onDay={setDayIdx}
+          pairId={pairId}
+          onPair={setPairId}
           onReact={(target, day, emoji) => void data.toggleReaction(target, day, emoji)}
           userId={userId}
-          loaded={data.loaded}
         />
       )}
-      {section === "matchups" && <MatchupsSection members={members} weekStart={weekStart} today={today} />}
       {section === "goals" && <GoalsSection challenges={data.challenges} members={members} weekStart={weekStart} />}
       {section === "feed" && <FeedSection items={feed} />}
     </section>
