@@ -108,8 +108,8 @@ interface Props {
   error: string | null;
   rules: ScoringRules;
   customized: boolean;
-  /** What this day scores under the standard rules, which is what leagues use. */
-  standardTotal: number;
+  /** Says when a league scores this day differently from your own scoring. */
+  leagueNote: string | null;
   onOpenScoring: () => void;
 }
 
@@ -128,7 +128,7 @@ export function DailyLog({
   error,
   rules,
   customized,
-  standardTotal,
+  leagueNote,
   onOpenScoring,
 }: Props) {
   const maxes = pillarMax(rules);
@@ -175,11 +175,7 @@ export function DailyLog({
         leagues={leagues}
         selected={selectedLeagueIds}
         onChange={onLeaguesChange}
-        note={
-          customized && selectedLeagueIds.length > 0
-            ? `Leagues score this day with the standard rules: ${fmt(standardTotal)} points.`
-            : null
-        }
+        note={leagueNote}
       />
 
       <div className="scoring-line">

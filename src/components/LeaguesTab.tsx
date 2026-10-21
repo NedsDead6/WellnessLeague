@@ -2,18 +2,17 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { addDays, dayLong, dayOfMonth, dayShortWeekday, periodStart } from "@/lib/dates";
-import { sumDays, type EntryMap } from "@/lib/history";
-import type { DayScore } from "@/lib/scoring";
+import { addDays, weekdayIndex } from "@/lib/dates";
+import type { EntryMap } from "@/lib/history";
+import { feedItems, firstWeek, scoreMember, weekOf, type LeagueMember } from "@/lib/league";
+import { normalizeRules } from "@/lib/scoring";
 import { supabase } from "@/lib/supabase";
 import type { League } from "@/lib/types";
-import { ownDays, useStandings } from "@/lib/useStandings";
-import { fmt } from "./DailyLog";
-import { StackedChart, segmentsOf, type ChartBar } from "./StackedChart";
+import { useLeagueData } from "@/lib/useLeagueData";
+import { FeedSection, GoalsSection, MatchupsSection, StandingsSection, WeekNav, type Mode } from "./LeagueSections";
+import { LeagueSettings } from "./LeagueSettings";
 
 const LAST_LEAGUE_KEY = "wl:last-league";
-
-type Mode = "day" | "week";
 
 function rememberedLeague(): string | null {
   try {
@@ -43,6 +42,7 @@ interface Props {
 export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared, today }: Props) {
   const userId = session?.user.id;
   const [chosen, setChosen] = useState<string | null>(() => (typeof window === "undefined" ? null : rememberedLeague()));
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const selected = leagues.find((l) => l.id === chosen) ?? leagues[0];
 
@@ -66,7 +66,14 @@ export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared
       {leagues.length > 1 && (
         <div className="league-tabs" role="group" aria-label="Your leagues">
           {leagues.map((league) => (
-            <button key={league.id} aria-pressed={league.id === selected?.id} onClick={() => setChosen(league.id)}>
+            <button
+              key={league.id}
+              aria-pressed={league.id === selected?.id}
+              onClick={() => {
+                setChosen(league.id);
+                setSettingsOpen(false);
+              }}
+            >
               {league.name}
             </button>
           ))}
@@ -76,14 +83,18 @@ export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared
       <LeagueTools
         league={selected}
         userId={userId!}
+        isOwner={selected?.owner_id === userId}
+        settingsOpen={settingsOpen}
+        onToggleSettings={() => setSettingsOpen(!settingsOpen)}
         onCreated={async (id) => {
           await onLeaguesChanged();
           setChosen(id);
+          setSettingsOpen(false);
         }}
       />
 
       {selected && (
-        <Standings
+        <LeagueView
           key={selected.id}
           league={selected}
           userId={userId!}
@@ -91,26 +102,33 @@ export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared
           entries={entries}
           shared={shared}
           showName={leagues.length === 1}
+          settingsOpen={settingsOpen && selected.owner_id === userId}
+          onCloseSettings={() => setSettingsOpen(false)}
+          onLeaguesChanged={onLeaguesChanged}
         />
       )}
     </>
   );
 }
 
-interface Member {
-  id: string;
-  name: string;
-  you: boolean;
-  days: Record<string, DayScore>;
-}
+type Section = "standings" | "matchups" | "goals" | "feed";
+const SECTIONS: { id: Section; label: string }[] = [
+  { id: "standings", label: "Standings" },
+  { id: "matchups", label: "Matchups" },
+  { id: "goals", label: "Goals" },
+  { id: "feed", label: "Feed" },
+];
 
-function Standings({
+function LeagueView({
   league,
   userId,
   today,
   entries,
   shared,
   showName,
+  settingsOpen,
+  onCloseSettings,
+  onLeaguesChanged,
 }: {
   league: League;
   userId: string;
@@ -118,128 +136,102 @@ function Standings({
   entries: EntryMap;
   shared: Record<string, string[]>;
   showName: boolean;
+  settingsOpen: boolean;
+  onCloseSettings: () => void;
+  onLeaguesChanged: () => void | Promise<void>;
 }) {
-  const [mode, setMode] = useState<Mode>("day");
-  const [day, setDay] = useState(today);
-  const { others, loaded, error, reload } = useStandings(league.id, userId, today);
+  const data = useLeagueData(league.id, userId);
+  const rules = useMemo(() => normalizeRules(league.scoring), [league.scoring]);
 
-  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(periodStart(today, "week"), i)), [today]);
-  const members: Member[] = useMemo(
-    () => [
-      ...others.map((o) => ({ id: o.userId, name: o.name, you: false, days: o.days })),
-      { id: userId, name: "You", you: true, days: ownDays(entries, shared, league.id, today) },
-    ],
-    [others, userId, entries, shared, league.id, today],
+  const [section, setSection] = useState<Section>("standings");
+  const [mode, setMode] = useState<Mode>("day");
+  const [offset, setOffset] = useState(0);
+  const [dayIdx, setDayIdx] = useState(() => weekdayIndex(today));
+
+  // Your own shared days come from this device so changes show instantly.
+  const members = useMemo(() => {
+    const mine: LeagueMember = {
+      id: userId,
+      name: "You",
+      you: true,
+      entries: Object.fromEntries(Object.entries(entries).filter(([day]) => (shared[day] ?? []).includes(league.id))),
+    };
+    const others: LeagueMember[] = data.others.map((o) => ({ id: o.id, name: o.name, you: false, entries: o.entries }));
+    return [...others, mine].map((m) => scoreMember(m, rules));
+  }, [data.others, entries, shared, league.id, userId, rules]);
+
+  const currentWeek = weekOf(today);
+  const weekStart = addDays(currentWeek, offset * 7);
+  const earliest = firstWeek(members) ?? currentWeek;
+  const feed = useMemo(
+    () => feedItems(members, data.reactions, data.others.filter((o) => o.joinedAt).map((o) => ({ userId: o.id, joinedAt: o.joinedAt })), today),
+    [members, data.reactions, data.others, today],
   );
 
-  const picked = mode === "week" ? weekDays : [day];
-  const rows = members
-    .map((m) => {
-      const scored = picked.filter((d) => m.days[d]).map((d) => ({ score: m.days[d] }));
-      return { ...m, totals: sumDays(scored), shared: scored.length };
-    })
-    .sort((a, b) => b.totals.total - a.totals.total || Number(b.you) - Number(a.you));
-
-  const leader = Math.max(1, rows[0].totals.total);
-  const youIndex = rows.findIndex((p) => p.you);
-  const when = mode === "week" ? "this week" : day === today ? "today" : `on ${dayLong(day)}`;
-  const anyone = rows.some((r) => r.shared > 0);
-  const ordinal = (n: number) => ["1st", "2nd", "3rd"][n - 1] ?? `${n}th`;
-
-  let summary: string;
-  if (others.length === 0) {
-    summary = loaded ? "You're the only member so far. Use Invite friends above to bring in friends." : "Loading standings...";
-  } else if (!anyone) {
-    summary = `Nobody has shared a day with this league ${when} yet.`;
-  } else if (youIndex === 0) {
-    summary = `You're in 1st place ${when}, ${fmt(rows[0].totals.total - rows[1].totals.total)} points ahead of ${rows[1].name}.`;
-  } else {
-    summary = `You're in ${ordinal(youIndex + 1)} place ${when}, ${fmt(rows[youIndex - 1].totals.total - rows[youIndex].totals.total)} points behind ${rows[youIndex - 1].name}.`;
+  if (settingsOpen) {
+    return (
+      <LeagueSettings
+        league={league}
+        today={today}
+        userId={userId}
+        challenges={data.challenges}
+        onBack={onCloseSettings}
+        onScoringSaved={onLeaguesChanged}
+        onChallengesChanged={data.reload}
+      />
+    );
   }
 
-  const bars: ChartBar[] = rows.map((r) => ({
-    key: r.id,
-    label: r.you ? "You" : r.name.split(" ")[0].slice(0, 7),
-    title: r.you ? `${r.name === "You" ? "You" : r.name}` : r.name,
-    sub: mode === "week" ? `This week, ${r.shared} ${r.shared === 1 ? "day" : "days"} shared` : dayLong(day),
-    segments: segmentsOf(r.totals),
-    hasData: r.shared > 0,
-    marked: r.you,
-  }));
+  const usesWeek = section !== "feed" && !(section === "standings" && mode === "season");
 
   return (
-    <section aria-label={`${league.name} standings`}>
+    <section aria-label={`${league.name}`}>
       <div className="group-head">
-        <span className="name">{showName ? league.name : "Standings"}</span>
-        <button className="text-button" type="button" onClick={() => void reload()}>
+        <span className="name">{showName ? league.name : "League"}</span>
+        <button className="text-button" type="button" onClick={() => void data.reload()}>
           Refresh
         </button>
       </div>
 
-      <div className="seg" role="group" aria-label="Time range">
-        <button aria-pressed={mode === "day"} onClick={() => setMode("day")}>
-          Day
-        </button>
-        <button aria-pressed={mode === "week"} onClick={() => setMode("week")}>
-          Week
-        </button>
-      </div>
-
-      {mode === "day" && (
-        <div className="day-picker" role="group" aria-label="Choose a day this week">
-          {weekDays.map((d) => {
-            const future = d > today;
-            const hasData = members.some((m) => m.days[d]);
-            return (
-              <button
-                key={d}
-                className="day-chip"
-                disabled={future}
-                aria-pressed={d === day}
-                aria-label={`${dayLong(d)}${hasData ? ", points shared" : ""}`}
-                onClick={() => setDay(d)}
-              >
-                <span className="dow">{d === today ? "Today" : dayShortWeekday(d)}</span>
-                <strong>{dayOfMonth(d)}</strong>
-                <span className={`mark ${hasData ? "on" : ""}`} aria-hidden="true" />
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {error && <p className="form-message">Couldn&apos;t load everyone&apos;s points: {error}</p>}
-      <div className="callout">{summary}</div>
-
-      <StackedChart
-        bars={bars}
-        emptyText="Nothing shared"
-        ariaLabel={`Points by member ${mode === "week" ? "this week" : `for ${dayLong(day)}`}, split by category`}
-      />
-
-      <div className="standings-list">
-        {rows.map((p, index) => (
-          <div className={`player ${p.you ? "you" : ""}`} key={p.id}>
-            <span className="rank">{index + 1}</span>
-            <span className="avatar">{p.name.charAt(0).toUpperCase()}</span>
-            <div className="player-body">
-              <div className="player-name">
-                {p.name}
-                {p.you && <span className="you-tag">You</span>}
-              </div>
-              <div className="bar">
-                <div style={{ width: `${Math.max(4, Math.min(100, (p.totals.total / leader) * 100))}%` }} />
-              </div>
-            </div>
-            <span className="player-pts">{fmt(p.totals.total)}</span>
-          </div>
+      <div className="seg sections" role="group" aria-label="League sections">
+        {SECTIONS.map((s) => (
+          <button key={s.id} aria-pressed={section === s.id} onClick={() => setSection(s.id)}>
+            {s.label}
+          </button>
         ))}
       </div>
 
-      <p className="demo-note">
-        Standings use the standard scoring for everyone, and only count days shared with this league. The streak bonus
-        isn&apos;t included yet.
-      </p>
+      {data.error && <p className="form-message">Couldn&apos;t load the league: {data.error}</p>}
+
+      {usesWeek && (
+        <WeekNav
+          weekStart={weekStart}
+          isCurrent={offset === 0}
+          canPrev={weekStart > earliest}
+          canNext={offset < 0}
+          onPrev={() => setOffset(offset - 1)}
+          onNext={() => setOffset(offset + 1)}
+        />
+      )}
+
+      {section === "standings" && (
+        <StandingsSection
+          members={members}
+          reactions={data.reactions}
+          today={today}
+          weekStart={weekStart}
+          mode={mode}
+          onMode={setMode}
+          dayIdx={Math.min(dayIdx, offset === 0 ? weekdayIndex(today) : 6)}
+          onDay={setDayIdx}
+          onReact={(target, day, emoji) => void data.toggleReaction(target, day, emoji)}
+          userId={userId}
+          loaded={data.loaded}
+        />
+      )}
+      {section === "matchups" && <MatchupsSection members={members} weekStart={weekStart} today={today} />}
+      {section === "goals" && <GoalsSection challenges={data.challenges} members={members} weekStart={weekStart} />}
+      {section === "feed" && <FeedSection items={feed} />}
     </section>
   );
 }
@@ -248,10 +240,16 @@ function Standings({
 function LeagueTools({
   league,
   userId,
+  isOwner,
+  settingsOpen,
+  onToggleSettings,
   onCreated,
 }: {
   league: League | undefined;
   userId: string;
+  isOwner: boolean;
+  settingsOpen: boolean;
+  onToggleSettings: () => void;
   onCreated: (id: string) => void | Promise<void>;
 }) {
   const [open, setOpen] = useState<"invite" | "create" | null>(league ? null : "create");
@@ -266,6 +264,11 @@ function LeagueTools({
         <button aria-expanded={open === "create"} onClick={() => toggle("create")}>
           New league
         </button>
+        {isOwner && (
+          <button aria-expanded={settingsOpen} onClick={onToggleSettings}>
+            Settings
+          </button>
+        )}
       </div>
       {open === "invite" && league && <InvitePanel league={league} />}
       {open === "create" && (

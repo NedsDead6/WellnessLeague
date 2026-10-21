@@ -1,0 +1,134 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { fetchAll } from "./fetchAll";
+import { normalizeEntry } from "./history";
+import type { Challenge, Reaction } from "./league";
+import type { DayEntry } from "./scoring";
+import { supabase } from "./supabase";
+
+export interface OtherMember {
+  id: string;
+  name: string;
+  joinedAt: string;
+  /** Days this person shared with the league. */
+  entries: Record<string, DayEntry>;
+}
+
+/**
+ * Everything about one league beyond the signed-in person's own days: the
+ * other members and every day they shared with it, plus reactions and the
+ * commissioner's team challenges.
+ */
+export function useLeagueData(leagueId: string | undefined, userId: string | undefined) {
+  const [others, setOthers] = useState<OtherMember[]>([]);
+  const [reactions, setReactions] = useState<Reaction[]>([]);
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!supabase || !leagueId || !userId) {
+      setOthers([]);
+      setLoaded(true);
+      return;
+    }
+    const client = supabase;
+    setLoaded(false);
+    try {
+      const roster = await client
+        .from("league_members")
+        .select("user_id, joined_at, profiles(display_name)")
+        .eq("league_id", leagueId);
+      if (roster.error) throw new Error(roster.error.message);
+      const members = ((roster.data ?? []) as any[]).map((row) => {
+        const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+        return {
+          id: row.user_id as string,
+          name: (profile?.display_name as string | undefined) ?? "Member",
+          joinedAt: (row.joined_at as string | undefined) ?? "",
+        };
+      });
+      const others = members.filter((m) => m.id !== userId);
+
+      const shares = await fetchAll((from, to) =>
+        client.from("entry_leagues").select("user_id, day").eq("league_id", leagueId).order("day").range(from, to),
+      );
+      const sharedKeys = new Set(shares.map((row) => `${row.user_id}|${row.day}`));
+      const otherIds = new Set(others.map((m) => m.id));
+      const firstDay = shares.filter((row) => otherIds.has(row.user_id)).map((row) => row.day as string).sort()[0];
+
+      const byUser = new Map<string, Record<string, DayEntry>>();
+      if (others.length > 0 && firstDay) {
+        const rows = await fetchAll((from, to) =>
+          client
+            .from("daily_entries")
+            .select("user_id, day, entry")
+            .in(
+              "user_id",
+              others.map((m) => m.id),
+            )
+            .gte("day", firstDay)
+            .order("day")
+            .range(from, to),
+        );
+        for (const row of rows) {
+          if (!sharedKeys.has(`${row.user_id}|${row.day}`)) continue;
+          const days = byUser.get(row.user_id) ?? {};
+          days[row.day as string] = normalizeEntry(row.entry);
+          byUser.set(row.user_id, days);
+        }
+      }
+
+      const reactionRows = await fetchAll((from, to) =>
+        client.from("league_reactions").select("id, league_id, target_user_id, day, reactor_id, emoji, created_at").eq("league_id", leagueId).order("created_at").range(from, to),
+      );
+      const challengeRows = await client.from("league_challenges").select("id, metric, target, week_start").eq("league_id", leagueId);
+      if (challengeRows.error) throw new Error(challengeRows.error.message);
+
+      setOthers(others.map((m) => ({ ...m, entries: byUser.get(m.id) ?? {} })));
+      setReactions(reactionRows as Reaction[]);
+      setChallenges(((challengeRows.data ?? []) as any[]).map((c) => ({ ...c, target: Number(c.target) })) as Challenge[]);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't load the league.");
+    }
+    setLoaded(true);
+  }, [leagueId, userId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  /** Adds your emoji to someone's day, or takes it back if it's already there. */
+  const toggleReaction = useCallback(
+    async (targetId: string, day: string, emoji: string) => {
+      if (!supabase || !leagueId || !userId) return;
+      const mine = reactions.find(
+        (r) => r.reactor_id === userId && r.target_user_id === targetId && r.day === day && r.emoji === emoji,
+      );
+      if (mine) {
+        setReactions((all) => all.filter((r) => r !== mine));
+        const { error: failed } = await supabase.from("league_reactions").delete().eq("id", mine.id);
+        if (failed) setError(failed.message);
+      } else {
+        const fresh: Reaction = { league_id: leagueId, target_user_id: targetId, day, reactor_id: userId, emoji, created_at: new Date().toISOString() };
+        setReactions((all) => [...all, fresh]);
+        const { data, error: failed } = await supabase
+          .from("league_reactions")
+          .insert({ league_id: leagueId, target_user_id: targetId, day, reactor_id: userId, emoji })
+          .select("id")
+          .single();
+        if (failed) {
+          setError(failed.message);
+          setReactions((all) => all.filter((r) => r !== fresh));
+        } else if (data) {
+          setReactions((all) => all.map((r) => (r === fresh ? { ...r, id: data.id as string } : r)));
+        }
+      }
+    },
+    [leagueId, userId, reactions],
+  );
+
+  return { others, reactions, challenges, loaded, error, reload: load, toggleReaction };
+}

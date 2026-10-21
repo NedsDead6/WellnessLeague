@@ -78,9 +78,12 @@ interface Props {
   onBack: () => void;
   status: SaveStatus;
   error: string | null;
+  backLabel?: string;
+  /** Replaces the intro paragraph (for example when editing a league's rules). */
+  intro?: ReactNode;
 }
 
-export function ScoringEditor({ rules, onChange, onReset, onBack, status, error }: Props) {
+export function ScoringEditor({ rules, onChange, onReset, onBack, status, error, backLabel = "Back to daily log", intro }: Props) {
   const setRule = (key: RuleKey, patch: Partial<Rule>) =>
     onChange({ ...rules, rules: { ...rules.rules, [key]: { ...rules.rules[key], ...patch } } });
 
@@ -101,12 +104,16 @@ export function ScoringEditor({ rules, onChange, onReset, onBack, status, error 
   return (
     <>
       <button className="text-button back" type="button" onClick={onBack}>
-        &larr; Back to daily log
+        &larr; {backLabel}
       </button>
 
       <p className="callout">
-        Set your own point values. They change your Personal stats only. Leagues always use the standard scoring, so
-        there is nothing to adjust when you log for a league.
+        {intro ?? (
+          <>
+            Set your own point values. They change your Personal stats only. Each league uses its own scoring, set by
+            the league owner, so there is nothing to adjust when you log for a league.
+          </>
+        )}
       </p>
 
       <div className="save-row">

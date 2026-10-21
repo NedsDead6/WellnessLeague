@@ -9,7 +9,7 @@ import { Personal } from "./Personal";
 import { ScoringEditor } from "./ScoringEditor";
 import { dayKey, periodLabel } from "@/lib/dates";
 import { currentStreak, streakAt } from "@/lib/history";
-import { EMPTY_DAY, isDefaultRules, scoreDay, type DayEntry } from "@/lib/scoring";
+import { EMPTY_DAY, isDefaultRules, normalizeRules, scoreDay, type DayEntry } from "@/lib/scoring";
 import { supabase } from "@/lib/supabase";
 import { useEntries } from "@/lib/useEntries";
 import { useLeagues } from "@/lib/useLeagues";
@@ -80,8 +80,17 @@ export function App() {
   }, [entries, shared, day, defaultLeagueIds, leagues]);
 
   const score = useMemo(() => scoreDay(entry, streakAt(entries, day), rules), [entry, entries, day, rules]);
-  // Leagues always score with the standard rules, whatever the person customizes.
-  const standardTotal = useMemo(() => scoreDay(entry, streakAt(entries, day)).total, [entry, entries, day]);
+  // Each league scores a day with its own rules (without the streak bonus), so say so when that
+  // differs from the person's own total.
+  const leagueNote = useMemo(() => {
+    const own = scoreDay(entry, 0, rules).total;
+    const parts = leagues
+      .filter((l) => selectedLeagueIds.includes(l.id))
+      .map((l) => ({ name: l.name, total: scoreDay(entry, 0, normalizeRules(l.scoring)).total }))
+      .filter((l) => l.total !== own)
+      .map((l) => `${l.name} counts it as ${Math.round(l.total * 100) / 100} points`);
+    return parts.length > 0 ? `${parts.join(". ")}, using that league's own scoring.` : null;
+  }, [entry, rules, leagues, selectedLeagueIds]);
   const streak = useMemo(() => (today ? currentStreak(entries, today) : 0), [entries, today]);
 
   if (!today) return <Loading />;
@@ -138,7 +147,7 @@ export function App() {
             error={error}
             rules={rules}
             customized={!isDefaultRules(rules)}
-            standardTotal={standardTotal}
+            leagueNote={leagueNote}
             onOpenScoring={openScoring}
           />
         )}

@@ -105,7 +105,7 @@ export function AccountTab({ session, rules, onResetScoring, onOpenScoring }: Pr
         <div className="row">
           <span className="row-label">{customized ? "Custom scoring for your Personal stats" : "Standard scoring"}</span>
           <span className="row-sub">
-            Custom point values only change your Personal stats. Leagues always use the standard scoring.
+            Custom point values only change your Personal stats. Each league uses its own scoring, set by the league owner.
           </span>
           <button className="secondary" type="button" onClick={onOpenScoring}>
             Customize points

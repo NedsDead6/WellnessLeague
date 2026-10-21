@@ -15,7 +15,7 @@ export function useLeagues(userId: string | undefined) {
     }
     const { data, error } = await supabase
       .from("league_members")
-      .select("leagues(id, name, invite_code)")
+      .select("leagues(id, name, invite_code, owner_id, scoring, created_at)")
       .eq("user_id", userId);
     if (error) return;
     const rows = (data ?? []) as unknown as { leagues: League | null }[];
