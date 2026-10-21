@@ -1297,3 +1297,73 @@ button:focus-visible {
   color: #fff;
   box-shadow: 0 4px 14px rgba(47, 107, 255, 0.45);
 }
+
+/* Compact league tools and the standings list */
+.seg button[aria-expanded="true"] {
+  background: var(--deep);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(47, 107, 255, 0.45);
+}
+
+.seg button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tools-seg {
+  margin-bottom: 8px;
+}
+
+.tools-panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tools-note {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.inline-row {
+  display: flex;
+  gap: 8px;
+}
+
+.inline-row .link-box,
+.inline-row .text-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--well);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+
+.inline-row .primary {
+  flex: none;
+  min-width: 92px;
+}
+
+.day-chip:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.standings-list {
+  margin-top: 14px;
+}
+
+.chart-wrap + .legend + .standings-list {
+  margin-top: 16px;
+}

@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
-import type { EntryMap } from "@/lib/history";
+import { addDays, dayLong, dayOfMonth, dayShortWeekday, periodStart } from "@/lib/dates";
+import { sumDays, type EntryMap } from "@/lib/history";
+import type { DayScore } from "@/lib/scoring";
 import { supabase } from "@/lib/supabase";
 import type { League } from "@/lib/types";
-import { ownPoints, useStandings } from "@/lib/useStandings";
+import { ownDays, useStandings } from "@/lib/useStandings";
 import { fmt } from "./DailyLog";
+import { StackedChart, segmentsOf, type ChartBar } from "./StackedChart";
 
 const LAST_LEAGUE_KEY = "wl:last-league";
 
-type Range = "today" | "week";
+type Mode = "day" | "week";
 
 function rememberedLeague(): string | null {
   try {
@@ -70,30 +73,35 @@ export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared
         </div>
       )}
 
-      {selected && (
-        <>
-          <Standings
-            key={selected.id}
-            league={selected}
-            userId={userId!}
-            today={today}
-            entries={entries}
-            shared={shared}
-            showName={leagues.length === 1}
-          />
-          <Invite league={selected} />
-        </>
-      )}
-
-      <CreateLeague
+      <LeagueTools
+        league={selected}
         userId={userId!}
         onCreated={async (id) => {
           await onLeaguesChanged();
           setChosen(id);
         }}
       />
+
+      {selected && (
+        <Standings
+          key={selected.id}
+          league={selected}
+          userId={userId!}
+          today={today}
+          entries={entries}
+          shared={shared}
+          showName={leagues.length === 1}
+        />
+      )}
     </>
   );
+}
+
+interface Member {
+  id: string;
+  name: string;
+  you: boolean;
+  days: Record<string, DayScore>;
 }
 
 function Standings({
@@ -111,28 +119,53 @@ function Standings({
   shared: Record<string, string[]>;
   showName: boolean;
 }) {
-  const [range, setRange] = useState<Range>("today");
+  const [mode, setMode] = useState<Mode>("day");
+  const [day, setDay] = useState(today);
   const { others, loaded, error, reload } = useStandings(league.id, userId, today);
 
-  const mine = ownPoints(entries, shared, league.id, today);
-  const everyone = [
-    ...others.map((p) => ({ id: p.userId, name: p.name, points: p[range], you: false })),
-    { id: userId, name: "You", points: mine[range], you: true },
-  ].sort((a, b) => b.points - a.points || Number(b.you) - Number(a.you));
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(periodStart(today, "week"), i)), [today]);
+  const members: Member[] = useMemo(
+    () => [
+      ...others.map((o) => ({ id: o.userId, name: o.name, you: false, days: o.days })),
+      { id: userId, name: "You", you: true, days: ownDays(entries, shared, league.id, today) },
+    ],
+    [others, userId, entries, shared, league.id, today],
+  );
 
-  const leader = Math.max(1, everyone[0].points);
-  const youIndex = everyone.findIndex((p) => p.you);
-  const when = range === "today" ? "today" : "this week";
+  const picked = mode === "week" ? weekDays : [day];
+  const rows = members
+    .map((m) => {
+      const scored = picked.filter((d) => m.days[d]).map((d) => ({ score: m.days[d] }));
+      return { ...m, totals: sumDays(scored), shared: scored.length };
+    })
+    .sort((a, b) => b.totals.total - a.totals.total || Number(b.you) - Number(a.you));
+
+  const leader = Math.max(1, rows[0].totals.total);
+  const youIndex = rows.findIndex((p) => p.you);
+  const when = mode === "week" ? "this week" : day === today ? "today" : `on ${dayLong(day)}`;
+  const anyone = rows.some((r) => r.shared > 0);
   const ordinal = (n: number) => ["1st", "2nd", "3rd"][n - 1] ?? `${n}th`;
 
   let summary: string;
   if (others.length === 0) {
-    summary = loaded ? "You're the only member so far. Share the invite link below to bring in friends." : "Loading standings...";
+    summary = loaded ? "You're the only member so far. Use Invite friends above to bring in friends." : "Loading standings...";
+  } else if (!anyone) {
+    summary = `Nobody has shared a day with this league ${when} yet.`;
   } else if (youIndex === 0) {
-    summary = `You're in 1st place ${when}, ${fmt(everyone[0].points - everyone[1].points)} points ahead of ${everyone[1].name}.`;
+    summary = `You're in 1st place ${when}, ${fmt(rows[0].totals.total - rows[1].totals.total)} points ahead of ${rows[1].name}.`;
   } else {
-    summary = `You're in ${ordinal(youIndex + 1)} place ${when}, ${fmt(everyone[youIndex - 1].points - everyone[youIndex].points)} points behind ${everyone[youIndex - 1].name}.`;
+    summary = `You're in ${ordinal(youIndex + 1)} place ${when}, ${fmt(rows[youIndex - 1].totals.total - rows[youIndex].totals.total)} points behind ${rows[youIndex - 1].name}.`;
   }
+
+  const bars: ChartBar[] = rows.map((r) => ({
+    key: r.id,
+    label: r.you ? "You" : r.name.split(" ")[0].slice(0, 7),
+    title: r.you ? `${r.name === "You" ? "You" : r.name}` : r.name,
+    sub: mode === "week" ? `This week, ${r.shared} ${r.shared === 1 ? "day" : "days"} shared` : dayLong(day),
+    segments: segmentsOf(r.totals),
+    hasData: r.shared > 0,
+    marked: r.you,
+  }));
 
   return (
     <section aria-label={`${league.name} standings`}>
@@ -144,33 +177,64 @@ function Standings({
       </div>
 
       <div className="seg" role="group" aria-label="Time range">
-        <button aria-pressed={range === "today"} onClick={() => setRange("today")}>
-          Today
+        <button aria-pressed={mode === "day"} onClick={() => setMode("day")}>
+          Day
         </button>
-        <button aria-pressed={range === "week"} onClick={() => setRange("week")}>
-          This week
+        <button aria-pressed={mode === "week"} onClick={() => setMode("week")}>
+          Week
         </button>
       </div>
+
+      {mode === "day" && (
+        <div className="day-picker" role="group" aria-label="Choose a day this week">
+          {weekDays.map((d) => {
+            const future = d > today;
+            const hasData = members.some((m) => m.days[d]);
+            return (
+              <button
+                key={d}
+                className="day-chip"
+                disabled={future}
+                aria-pressed={d === day}
+                aria-label={`${dayLong(d)}${hasData ? ", points shared" : ""}`}
+                onClick={() => setDay(d)}
+              >
+                <span className="dow">{d === today ? "Today" : dayShortWeekday(d)}</span>
+                <strong>{dayOfMonth(d)}</strong>
+                <span className={`mark ${hasData ? "on" : ""}`} aria-hidden="true" />
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {error && <p className="form-message">Couldn&apos;t load everyone&apos;s points: {error}</p>}
       <div className="callout">{summary}</div>
 
-      {everyone.map((p, index) => (
-        <div className={`player ${p.you ? "you" : ""}`} key={p.id}>
-          <span className="rank">{index + 1}</span>
-          <span className="avatar">{p.name.charAt(0).toUpperCase()}</span>
-          <div className="player-body">
-            <div className="player-name">
-              {p.name}
-              {p.you && <span className="you-tag">You</span>}
+      <StackedChart
+        bars={bars}
+        emptyText="Nothing shared"
+        ariaLabel={`Points by member ${mode === "week" ? "this week" : `for ${dayLong(day)}`}, split by category`}
+      />
+
+      <div className="standings-list">
+        {rows.map((p, index) => (
+          <div className={`player ${p.you ? "you" : ""}`} key={p.id}>
+            <span className="rank">{index + 1}</span>
+            <span className="avatar">{p.name.charAt(0).toUpperCase()}</span>
+            <div className="player-body">
+              <div className="player-name">
+                {p.name}
+                {p.you && <span className="you-tag">You</span>}
+              </div>
+              <div className="bar">
+                <div style={{ width: `${Math.max(4, Math.min(100, (p.totals.total / leader) * 100))}%` }} />
+              </div>
             </div>
-            <div className="bar">
-              <div style={{ width: `${Math.max(4, Math.min(100, (p.points / leader) * 100))}%` }} />
-            </div>
+            <span className="player-pts">{fmt(p.totals.total)}</span>
           </div>
-          <span className="player-pts">{fmt(p.points)}</span>
-        </div>
-      ))}
+        ))}
+      </div>
 
       <p className="demo-note">
         Standings use the standard scoring for everyone, and only count days shared with this league. The streak bonus
@@ -180,7 +244,44 @@ function Standings({
   );
 }
 
-function Invite({ league }: { league: League }) {
+/** Invite friends and create a league, tucked into two compact toggles. */
+function LeagueTools({
+  league,
+  userId,
+  onCreated,
+}: {
+  league: League | undefined;
+  userId: string;
+  onCreated: (id: string) => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState<"invite" | "create" | null>(league ? null : "create");
+  const toggle = (which: "invite" | "create") => setOpen(open === which ? null : which);
+
+  return (
+    <div className="tools">
+      <div className="seg tools-seg" role="group" aria-label="League tools">
+        <button aria-expanded={open === "invite"} disabled={!league} onClick={() => toggle("invite")}>
+          Invite friends
+        </button>
+        <button aria-expanded={open === "create"} onClick={() => toggle("create")}>
+          New league
+        </button>
+      </div>
+      {open === "invite" && league && <InvitePanel league={league} />}
+      {open === "create" && (
+        <CreatePanel
+          userId={userId}
+          onCreated={async (id) => {
+            await onCreated(id);
+            setOpen(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function InvitePanel({ league }: { league: League }) {
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const link = `${typeof window === "undefined" ? "" : window.location.origin}/join/${league.invite_code}`;
@@ -196,22 +297,20 @@ function Invite({ league }: { league: League }) {
   };
 
   return (
-    <section aria-label="Invite friends">
-      <div className="group-head">
-        <span className="name">Invite friends to {league.name}</span>
-      </div>
-      <div className="row">
+    <div className="tools-panel">
+      <span className="tools-note">Anyone with this link can join {league.name}.</span>
+      <div className="inline-row">
         <input className="link-box" readOnly value={link} aria-label={`Invite link for ${league.name}`} onFocus={(e) => e.currentTarget.select()} />
         <button className="primary" type="button" onClick={copy}>
-          {copied ? "Link copied" : "Copy invite link"}
+          {copied ? "Copied" : "Copy"}
         </button>
-        {message && <p className="form-message">{message}</p>}
       </div>
-    </section>
+      {message && <p className="form-message">{message}</p>}
+    </div>
   );
 }
 
-function CreateLeague({ userId, onCreated }: { userId: string; onCreated: (id: string) => void | Promise<void> }) {
+function CreatePanel({ userId, onCreated }: { userId: string; onCreated: (id: string) => void | Promise<void> }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -235,24 +334,21 @@ function CreateLeague({ userId, onCreated }: { userId: string; onCreated: (id: s
   };
 
   return (
-    <section aria-label="Create a league">
-      <div className="group-head">
-        <span className="name">Create a league</span>
-      </div>
-      <form className="form" onSubmit={create}>
-        <label className="field">
-          <span>League name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required placeholder="Friends League" />
-        </label>
+    <form className="tools-panel" onSubmit={create}>
+      <label className="tools-note" htmlFor="new-league-name">
+        League name
+      </label>
+      <div className="inline-row">
+        <input id="new-league-name" className="text-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required placeholder="Friends League" />
         <button className="primary" type="submit" disabled={busy}>
-          {busy ? "Creating..." : "Create league"}
+          {busy ? "Creating..." : "Create"}
         </button>
-      </form>
+      </div>
       {message && (
         <p className="form-message" role="status">
           {message}
         </p>
       )}
-    </section>
+    </form>
   );
 }

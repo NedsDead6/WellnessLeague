@@ -3,23 +3,23 @@
 import { useCallback, useEffect, useState } from "react";
 import { addDays, periodStart } from "./dates";
 import { normalizeEntry } from "./history";
-import { scoreDay } from "./scoring";
+import { scoreDay, type DayEntry, type DayScore } from "./scoring";
 import { supabase } from "./supabase";
 
-export interface MemberPoints {
+/** One member's shared days this week, each scored with the standard rules. */
+export interface MemberDays {
   userId: string;
   name: string;
-  today: number;
-  week: number;
+  days: Record<string, DayScore>;
 }
 
 /**
- * Everyone else in a league and the points they shared with it, for today and
- * for the current week (Monday to today). Standings always use the standard
+ * Everyone else in a league and the days they shared with it this week
+ * (Monday to today), scored by category. Standings always use the standard
  * scoring, whatever custom scoring each person uses for their own stats.
  */
 export function useStandings(leagueId: string | undefined, userId: string | undefined, today: string) {
-  const [others, setOthers] = useState<MemberPoints[]>([]);
+  const [others, setOthers] = useState<MemberDays[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,23 +82,15 @@ export function useStandings(leagueId: string | undefined, userId: string | unde
       return;
     }
 
-    const points = new Map<string, { today: number; week: number }>();
+    const byUser = new Map<string, Record<string, DayScore>>();
     for (const row of (rows.data ?? []) as any[]) {
       if (!sharedKeys.has(`${row.user_id}|${row.day}`)) continue;
-      const total = scoreDay(normalizeEntry(row.entry), 0).total;
-      const sum = points.get(row.user_id) ?? { today: 0, week: 0 };
-      sum.week += total;
-      if (row.day === today) sum.today += total;
-      points.set(row.user_id, sum);
+      const days = byUser.get(row.user_id) ?? {};
+      days[row.day as string] = scoreDay(normalizeEntry(row.entry), 0);
+      byUser.set(row.user_id, days);
     }
 
-    setOthers(
-      members.map((m) => ({
-        ...m,
-        today: Math.round((points.get(m.userId)?.today ?? 0) * 1000) / 1000,
-        week: Math.round((points.get(m.userId)?.week ?? 0) * 1000) / 1000,
-      })),
-    );
+    setOthers(members.map((m) => ({ ...m, days: byUser.get(m.userId) ?? {} })));
     setError(null);
     setLoaded(true);
   }, [leagueId, userId, today]);
@@ -110,22 +102,17 @@ export function useStandings(leagueId: string | undefined, userId: string | unde
   return { others, loaded, error, reload: load };
 }
 
-/** The signed-in person's own points for a league, from entries already on this device. */
-export function ownPoints(
-  entries: Record<string, import("./scoring").DayEntry>,
+/** The signed-in person's own shared days for a league, from entries already on this device. */
+export function ownDays(
+  entries: Record<string, DayEntry>,
   shared: Record<string, string[]>,
   leagueId: string,
   today: string,
-) {
-  const weekStart = periodStart(today, "week");
-  let todayPoints = 0;
-  let week = 0;
-  for (let day = weekStart; day <= today; day = addDays(day, 1)) {
+): Record<string, DayScore> {
+  const days: Record<string, DayScore> = {};
+  for (let day = periodStart(today, "week"); day <= today; day = addDays(day, 1)) {
     const entry = entries[day];
-    if (!entry || !(shared[day] ?? []).includes(leagueId)) continue;
-    const total = scoreDay(entry, 0).total;
-    week += total;
-    if (day === today) todayPoints += total;
+    if (entry && (shared[day] ?? []).includes(leagueId)) days[day] = scoreDay(entry, 0);
   }
-  return { today: Math.round(todayPoints * 1000) / 1000, week: Math.round(week * 1000) / 1000 };
+  return days;
 }

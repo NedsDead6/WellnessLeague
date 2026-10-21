@@ -107,7 +107,7 @@ export interface Totals {
   categories: CategoryPoints;
 }
 
-export function sumDays(days: ScoredDay[]): Totals {
+export function sumDays(days: { score: DayScore }[]): Totals {
   const totals: Totals = {
     total: 0,
     physical: 0,
