@@ -9,7 +9,7 @@ import { normalizeRules } from "@/lib/scoring";
 import { supabase } from "@/lib/supabase";
 import type { League } from "@/lib/types";
 import { useLeagueData } from "@/lib/useLeagueData";
-import { AwardsSection, FeedSection, GoalsSection, MatchupsSection, StandingsSection, WeekNav, type Mode } from "./LeagueSections";
+import { AwardsSection, FeedSection, MatchupsSection, StandingsSection, WeekNav, type Mode } from "./LeagueSections";
 import { LeagueSettings } from "./LeagueSettings";
 
 const LAST_LEAGUE_KEY = "wl:last-league";
@@ -135,11 +135,10 @@ export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared
   );
 }
 
-type Section = "standings" | "matchups" | "goals" | "awards" | "feed";
+type Section = "standings" | "matchups" | "awards" | "feed";
 const SECTIONS: { id: Section; label: string }[] = [
   { id: "standings", label: "Standings" },
   { id: "matchups", label: "Matchups" },
-  { id: "goals", label: "Goals" },
   { id: "awards", label: "Awards" },
   { id: "feed", label: "Feed" },
 ];
@@ -247,6 +246,7 @@ function LeagueView({
           members={members}
           today={today}
           weekStart={weekStart}
+          challenges={data.challenges}
           onOpenMatchup={(id) => {
             setPairId(id);
             onSection("matchups");
@@ -270,7 +270,6 @@ function LeagueView({
         />
       )}
       {section === "awards" && <AwardsSection members={members} weekStart={weekStart} />}
-      {section === "goals" && <GoalsSection challenges={data.challenges} members={members} weekStart={weekStart} />}
       {section === "feed" && <FeedSection items={feed} reactions={data.feedReactions} userId={userId} onReact={data.toggleFeedReaction} onPost={data.addPost} onDelete={(id) => void data.deletePost(id)} />}
     </section>
   );

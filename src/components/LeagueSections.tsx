@@ -119,11 +119,13 @@ export function StandingsSection({
   members,
   today,
   weekStart,
+  challenges,
   onOpenMatchup,
 }: {
   members: ScoredMember[];
   today: string;
   weekStart: string;
+  challenges: Challenge[];
   onOpenMatchup: (aId: string) => void;
 }) {
   const currentWeek = weekOf(today);
@@ -232,6 +234,13 @@ export function StandingsSection({
             );
           })
         )}
+      </section>
+
+      <section aria-label="Team goals">
+        <div className="group-head">
+          <span className="name">Team goals</span>
+        </div>
+        <GoalsSection challenges={challenges} members={members} weekStart={weekStart} />
       </section>
 
       <section aria-label="League table">
