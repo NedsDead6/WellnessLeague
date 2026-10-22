@@ -103,6 +103,10 @@ interface Props {
   score: DayScore;
   onChange: (next: DayEntry) => void;
   onPickDay: (day: string) => void;
+  step: 0 | 1 | 2;
+  onStep: (step: 0 | 1 | 2) => void;
+  suggestedLeagueIds: string[];
+  onSuggestLeagues: (ids: string[]) => void;
   leagues: League[];
   selectedLeagueIds: string[];
   onLeaguesChange: (ids: string[]) => void;
@@ -123,6 +127,10 @@ export function DailyLog({
   score,
   onChange,
   onPickDay,
+  step,
+  onStep,
+  suggestedLeagueIds,
+  onSuggestLeagues,
   leagues,
   selectedLeagueIds,
   onLeaguesChange,
@@ -161,6 +169,29 @@ export function DailyLog({
   ];
 
   const heading = day === today ? "Today's points" : `Points for ${dayLong(day)}`;
+
+  if (step === 0) {
+    return (
+      <DestinationPrompt
+        leagues={leagues}
+        selected={suggestedLeagueIds}
+        onChange={onSuggestLeagues}
+        onContinue={() => onStep(1)}
+      />
+    );
+  }
+
+  if (step === 1) {
+    return (
+      <>
+        <Destination leagues={leagues} selected={suggestedLeagueIds} onChange={onSuggestLeagues} note={null} />
+        <section className="step-card" aria-label="Choose a day">
+          <h2 className="step-title">Which day are you logging?</h2>
+          <DayPicker today={today} selected="" entries={entries} onPick={onPickDay} />
+        </section>
+      </>
+    );
+  }
 
   return (
     <>
@@ -305,6 +336,40 @@ function DayPicker({
         );
       })}
     </div>
+  );
+}
+
+function DestinationPrompt({
+  leagues,
+  selected,
+  onChange,
+  onContinue,
+}: {
+  leagues: League[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+  onContinue: () => void;
+}) {
+  const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  return (
+    <section className="step-card" aria-label="Choose where this entry counts">
+      <h2 className="step-title">Where should this entry count?</h2>
+      <p className="step-note">Your entry always counts toward your Personal stats. Pick any leagues you also want to share it with.</p>
+      <label className="check">
+        <input type="checkbox" checked disabled />
+        <span>Personal (always)</span>
+      </label>
+      {leagues.map((league) => (
+        <label className="check" key={league.id}>
+          <input type="checkbox" checked={selected.includes(league.id)} onChange={() => toggle(league.id)} />
+          <span>{league.name}</span>
+        </label>
+      ))}
+      {leagues.length === 0 && <p className="step-note">Create or join a league on the Leagues tab to count entries there too.</p>}
+      <button type="button" className="step-continue" onClick={onContinue}>
+        Continue
+      </button>
+    </section>
   );
 }
 

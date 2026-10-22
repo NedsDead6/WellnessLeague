@@ -59,6 +59,9 @@ export function App() {
 
   const [tab, setTab] = useState<Tab>("log");
   const [scoringOpen, setScoringOpen] = useState(false);
+  // The daily log walks through three steps: where it counts, which day, then the entry itself.
+  const [logStep, setLogStep] = useState<0 | 1 | 2>(0);
+  const [pickedIds, setPickedIds] = useState<string[] | null>(null);
   // Dates are filled in after the page loads so the server and browser agree.
   const [today, setToday] = useState("");
   const [day, setDay] = useState("");
@@ -77,9 +80,9 @@ export function App() {
   }, [entries, shared]);
 
   const selectedLeagueIds = useMemo(() => {
-    const chosen = entries[day] !== undefined ? (shared[day] ?? []) : defaultLeagueIds;
+    const chosen = entries[day] !== undefined ? (shared[day] ?? []) : (pickedIds ?? defaultLeagueIds);
     return chosen.filter((id) => leagues.some((l) => l.id === id));
-  }, [entries, shared, day, defaultLeagueIds, leagues]);
+  }, [entries, shared, day, defaultLeagueIds, pickedIds, leagues]);
 
   const score = useMemo(() => scoreDay(entry, streakAt(entries, day), rules), [entry, entries, day, rules]);
   // Each league scores a day with its own rules (without the streak bonus), so say so when that
@@ -110,7 +113,7 @@ export function App() {
   };
 
   const heading = tab === "log" && scoringOpen ? "My scoring" : TITLES[tab];
-  const kicker = tab === "log" && !scoringOpen ? periodLabel(day, "day") : "Own Your Day";
+  const kicker = tab === "log" && !scoringOpen && logStep === 2 ? periodLabel(day, "day") : "Own Your Day";
 
   return (
     <div className="shell">
@@ -141,10 +144,20 @@ export function App() {
             entry={entry}
             score={score}
             onChange={(next) => save(day, next, selectedLeagueIds)}
-            onPickDay={setDay}
+            onPickDay={(d) => {
+              setDay(d);
+              setLogStep(2);
+            }}
+            step={logStep}
+            onStep={setLogStep}
+            suggestedLeagueIds={pickedIds ?? defaultLeagueIds.filter((id) => leagues.some((l) => l.id === id))}
+            onSuggestLeagues={setPickedIds}
             leagues={leagues}
             selectedLeagueIds={selectedLeagueIds}
-            onLeaguesChange={(ids) => save(day, entry, ids)}
+            onLeaguesChange={(ids) => {
+              setPickedIds(ids);
+              if (logStep === 2) save(day, entry, ids);
+            }}
             status={status}
             error={error}
             rules={rules}

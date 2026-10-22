@@ -2433,3 +2433,36 @@ button:focus-visible {
   color: var(--muted);
   margin-top: 2px;
 }
+
+/* Daily log steps */
+.step-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 14px 14px;
+  margin-bottom: 12px;
+}
+
+.step-title {
+  margin: 0 0 6px;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.step-note {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.step-continue {
+  margin-top: 10px;
+  width: 100%;
+  min-height: 48px;
+  border-radius: 12px;
+  background: var(--deep);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
