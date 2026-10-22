@@ -98,19 +98,38 @@ const SHORT: Record<CategoryKey, string> = {
 
 const sign = (n: number) => (n === 0 ? "0" : `${n > 0 ? "+" : "-"}${fmt(round1(Math.abs(n)))}`);
 
-/** The raw numbers behind the points, which league mates can see: steps, exercise minutes and what the exercise was. */
+type DetailKey = "steps" | "exerciseMin" | "meditationMin" | "workHours" | "socialHours" | "readingMin" | "journalMin" | "worshipMin" | "serviceHours" | "screenHours" | "drinks" | "cigarettes";
+
+const mins = (n: number) => (n >= 60 ? `${Math.floor(n / 60)}h${n % 60 ? ` ${n % 60}m` : ""}` : `${n} min`);
+const hrs = (n: number) => `${Number(n.toFixed(1))} hrs`;
+
+/** The raw numbers league mates can see next to the points. */
+const DETAIL_ROWS: { key: DetailKey; label: string; show: (n: number) => string }[] = [
+  { key: "steps", label: "Steps", show: (n) => n.toLocaleString("en-US") },
+  { key: "exerciseMin", label: "Exercise", show: mins },
+  { key: "meditationMin", label: "Meditation", show: mins },
+  { key: "workHours", label: "Work", show: hrs },
+  { key: "socialHours", label: "Social time", show: hrs },
+  { key: "readingMin", label: "Reading", show: mins },
+  { key: "journalMin", label: "Journaling", show: mins },
+  { key: "worshipMin", label: "Worship and prayer", show: mins },
+  { key: "serviceHours", label: "Service", show: hrs },
+  { key: "screenHours", label: "Screen time", show: hrs },
+  { key: "drinks", label: "Alcoholic drinks", show: (n) => String(n) },
+  { key: "cigarettes", label: "Cigarettes", show: (n) => String(n) },
+];
+
+/** Totals of those numbers over the days picked, plus what the exercise was. */
 function detailsFor(m: ScoredMember, picked: string[]) {
-  let steps = 0;
-  let minutes = 0;
+  const totals = Object.fromEntries(DETAIL_ROWS.map((r) => [r.key, 0])) as Record<DetailKey, number>;
   const notes: string[] = [];
   for (const d of picked) {
     const e = m.entries[d];
     if (!e) continue;
-    steps += e.steps;
-    minutes += e.exerciseMin;
+    for (const r of DETAIL_ROWS) totals[r.key] += e[r.key] ?? 0;
     if (e.exerciseNote) notes.push(picked.length > 1 ? `${dayShortWeekday(d)}: ${e.exerciseNote}` : e.exerciseNote);
   }
-  return { steps, minutes, notes };
+  return { totals, notes };
 }
 
 // ---------------------------------------------------------------- Standings
@@ -594,16 +613,13 @@ export function MatchupsSection({ members, reactions, today, weekStart, mode, on
                 <span />
               </div>
             ))}
-            <div className="duel-row">
-              <span className="win">{dl.steps.toLocaleString("en-US")}</span>
-              <span>Steps</span>
-              <span />
-            </div>
-            <div className="duel-row">
-              <span className="win">{dl.minutes} min</span>
-              <span>Exercise</span>
-              <span />
-            </div>
+            {DETAIL_ROWS.map((r) => (
+              <div className="duel-row" key={r.key}>
+                <span className="win">{r.show(dl.totals[r.key])}</span>
+                <span>{r.label}</span>
+                <span />
+              </div>
+            ))}
             {dl.notes.length > 0 && (
               <ul className="duel-notes solo-notes" aria-label="What they did for exercise">
                 {dl.notes.map((n, k) => (
@@ -703,16 +719,13 @@ export function MatchupsSection({ members, reactions, today, weekStart, mode, on
               <span>Details</span>
               <span />
             </div>
-            <div className="duel-row">
-              <span>{dl.steps.toLocaleString("en-US")}</span>
-              <span>Steps</span>
-              <span>{dr.steps.toLocaleString("en-US")}</span>
-            </div>
-            <div className="duel-row">
-              <span>{dl.minutes} min</span>
-              <span>Exercise</span>
-              <span>{dr.minutes} min</span>
-            </div>
+            {DETAIL_ROWS.map((r) => (
+              <div className="duel-row" key={r.key}>
+                <span>{r.show(dl.totals[r.key])}</span>
+                <span>{r.label}</span>
+                <span>{r.show(dr.totals[r.key])}</span>
+              </div>
+            ))}
             <div className="duel-notes" aria-label="What they did for exercise">
               {[dl, dr].map((d, i) => (
                 <ul key={i}>
