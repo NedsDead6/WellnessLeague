@@ -14,6 +14,8 @@ import { supabase } from "@/lib/supabase";
 import { useAvatar } from "@/lib/useAvatar";
 import { useEntries } from "@/lib/useEntries";
 import { useLeagues } from "@/lib/useLeagues";
+import { useNotifications } from "@/lib/useNotifications";
+import type { NotifTarget } from "@/lib/notifications";
 import { useScoringRules } from "@/lib/useScoringRules";
 import { useSession } from "@/lib/useSession";
 
@@ -97,6 +99,10 @@ export function App() {
     return parts.length > 0 ? `${parts.join(". ")}, using that league's own scoring.` : null;
   }, [entry, rules, leagues, selectedLeagueIds]);
   const streak = useMemo(() => (today ? currentStreak(entries, today) : 0), [entries, today]);
+  const notes = useNotifications(userId, leagues, today);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [newSince, setNewSince] = useState("");
+  const [leagueTarget, setLeagueTarget] = useState<{ leagueId: string; nonce: number; target: NotifTarget } | null>(null);
 
   if (!today) return <Loading />;
   if (supabase && !ready) return <Loading />;
@@ -122,8 +128,61 @@ export function App() {
           <div className="kicker">{kicker}</div>
           <h1 className="title">{heading}</h1>
         </div>
-        <span className="streak">{streak}-day streak</span>
+        <div className="head-right">
+          <span className="streak">{streak}-day streak</span>
+          {supabase && (
+            <button
+              type="button"
+              className="bell"
+              aria-label={notes.unread > 0 ? `Notifications, ${notes.unread} new` : "Notifications"}
+              aria-expanded={notifOpen}
+              onClick={() => {
+                if (!notifOpen) setNewSince(notes.markAllRead());
+                setNotifOpen(!notifOpen);
+              }}
+            >
+              <svg {...ICON}>
+                <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0" />
+              </svg>
+              {notes.unread > 0 && <span className="badge">{notes.unread > 9 ? "9+" : notes.unread}</span>}
+            </button>
+          )}
+        </div>
       </header>
+
+      {notifOpen && (
+        <section className="notif-panel" aria-label="Notifications">
+          <div className="notif-head">
+            <strong>Notifications</strong>
+            <button type="button" className="text-button" onClick={() => setNotifOpen(false)}>
+              Close
+            </button>
+          </div>
+          {notes.items.length === 0 ? (
+            <p className="notif-empty">Nothing yet. Reactions, feed posts and weekly award summaries will show up here.</p>
+          ) : (
+            <ul>
+              {notes.items.map((n) => (
+                <li key={n.id}>
+                  <button
+                    type="button"
+                    className={`notif-item ${newSince && Date.parse(n.at) > Date.parse(newSince) ? "new" : ""}`}
+                    onClick={() => {
+                      setNotifOpen(false);
+                      setScoringOpen(false);
+                      setLeagueTarget({ leagueId: n.leagueId, nonce: Date.now(), target: n.target });
+                      setTab("leagues");
+                    }}
+                  >
+                    <span className="notif-text">{n.text}</span>
+                    <span className="notif-meta">{n.leagueName}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <main className="main">
         {tab === "log" && scoringOpen && (
@@ -177,6 +236,7 @@ export function App() {
             updatedAt={updatedAt}
             avatarUrl={avatar.url}
             today={today}
+            target={leagueTarget}
           />
         )}
         {tab === "account" && (
@@ -205,6 +265,7 @@ export function App() {
               <path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7" />
             </svg>
             Leagues
+            {notes.unread > 0 && <span className="badge nav-badge">{notes.unread > 9 ? "9+" : notes.unread}</span>}
           </button>
           <button aria-current={tab === "account" ? "page" : undefined} onClick={() => choose("account")}>
             <svg {...ICON}>

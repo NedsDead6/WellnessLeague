@@ -280,3 +280,53 @@ describe("award counts", () => {
     expect(after.b.steps).toBe(1);
   });
 });
+
+import { buildNotifications, unreadCount } from "./notifications";
+
+describe("notifications", () => {
+  const base = {
+    userId: "me",
+    today: "2026-10-21",
+    leagues: [{ id: "L", name: "Friends", created_at: "2026-09-01T00:00:00Z" }],
+    names: { me: "Me", sam: "Sam" },
+    dayReactions: [],
+    feedReactions: [],
+    myPosts: [{ id: "9", body: "hello" }],
+    posts: [],
+  };
+
+  it("covers reactions to your day, your post and your highlight, other people's posts, and the finished week", () => {
+    const items = buildNotifications({
+      ...base,
+      dayReactions: [
+        { league_id: "L", reactor_id: "sam", day: "2026-10-20", emoji: "🔥", created_at: "2026-10-20T20:00:00Z" },
+        { league_id: "L", reactor_id: "me", day: "2026-10-20", emoji: "🔥", created_at: "2026-10-20T20:00:00Z" },
+      ],
+      feedReactions: [
+        { league_id: "L", item_key: "p-9", reactor_id: "sam", emoji: "👏", created_at: "2026-10-21T10:00:00Z" },
+        { league_id: "L", item_key: "me-2026-10-20-walked 12,000 steps", reactor_id: "sam", emoji: "💪", created_at: "2026-10-21T11:00:00Z" },
+        { league_id: "L", item_key: "sam-2026-10-20-read for 60 min", reactor_id: "sam", emoji: "👍", created_at: "2026-10-21T12:00:00Z" },
+      ],
+      posts: [{ id: "5", league_id: "L", user_id: "sam", body: "Who is up for a run?", created_at: "2026-10-21T09:00:00Z" }],
+    });
+    const texts = items.map((n) => n.text);
+    expect(items).toHaveLength(5); // own reaction and reactions to Sam's highlight are skipped
+    expect(texts.some((t) => t.includes("your post"))).toBe(true);
+    expect(texts.some((t) => t.includes("your highlight (walked 12,000 steps)"))).toBe(true);
+    expect(texts.some((t) => t.includes("posted: Who is up"))).toBe(true);
+    const week = items.find((n) => n.kind === "week")!;
+    expect(week.target).toEqual({ section: "awards", weekStart: "2026-10-12" });
+    expect(items.find((n) => n.text.includes("to your Tue"))!.target.day).toBe("2026-10-20");
+  });
+
+  it("counts only what is newer than the last look, and skips the week note for a brand new league", () => {
+    const items = buildNotifications({
+      ...base,
+      leagues: [{ id: "L", name: "Friends", created_at: "2026-10-20T00:00:00Z" }],
+      posts: [{ id: "5", league_id: "L", user_id: "sam", body: "hi", created_at: "2026-10-21T09:00:00Z" }],
+    });
+    expect(items.some((n) => n.kind === "week")).toBe(false);
+    expect(unreadCount(items, "2026-10-21T08:00:00Z")).toBe(1);
+    expect(unreadCount(items, "2026-10-21T10:00:00Z")).toBe(0);
+  });
+});

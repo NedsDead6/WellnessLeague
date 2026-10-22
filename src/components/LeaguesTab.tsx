@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { addDays, weekdayIndex } from "@/lib/dates";
+import { addDays, diffDays, weekdayIndex } from "@/lib/dates";
+import type { NotifTarget } from "@/lib/notifications";
 import type { EntryMap } from "@/lib/history";
 import { feedItems, firstWeek, scoreMember, weekOf, type LeagueMember } from "@/lib/league";
 import { normalizeRules } from "@/lib/scoring";
@@ -39,13 +40,24 @@ interface Props {
   updatedAt: Record<string, string>;
   avatarUrl: string | null;
   today: string;
+  /** Set when the person opens a notification: which league, section and week to land on. */
+  target?: { leagueId: string; nonce: number; target: NotifTarget } | null;
 }
 
-export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared, updatedAt, avatarUrl, today }: Props) {
+export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared, updatedAt, avatarUrl, today, target }: Props) {
   const userId = session?.user.id;
   const [chosen, setChosen] = useState<string | null>(() => (typeof window === "undefined" ? null : rememberedLeague()));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [section, setSection] = useState<Section>("standings");
+
+  const handled = useRef(0);
+  useEffect(() => {
+    if (!target || handled.current === target.nonce) return;
+    handled.current = target.nonce;
+    setChosen(target.leagueId);
+    setSection(target.target.section);
+    setSettingsOpen(false);
+  }, [target]);
 
   const selected = leagues.find((l) => l.id === chosen) ?? leagues[0];
 
@@ -115,7 +127,8 @@ export function LeaguesTab({ session, leagues, onLeaguesChanged, entries, shared
 
       {selected && (
         <LeagueView
-          key={selected.id}
+          key={`${selected.id}:${target?.leagueId === selected.id ? target.nonce : 0}`}
+          initial={target?.leagueId === selected.id ? target.target : undefined}
           league={selected}
           userId={userId!}
           today={today}
@@ -152,6 +165,7 @@ function LeagueView({
   updatedAt,
   avatarUrl,
   showName,
+  initial,
   section,
   onSection,
   settingsOpen,
@@ -166,6 +180,7 @@ function LeagueView({
   updatedAt: Record<string, string>;
   avatarUrl: string | null;
   showName: boolean;
+  initial?: NotifTarget;
   section: Section;
   onSection: (s: Section) => void;
   settingsOpen: boolean;
@@ -176,8 +191,10 @@ function LeagueView({
   const rules = useMemo(() => normalizeRules(league.scoring), [league.scoring]);
 
   const [mode, setMode] = useState<Mode>("day");
-  const [offset, setOffset] = useState(0);
-  const [dayIdx, setDayIdx] = useState(() => weekdayIndex(today));
+  const [offset, setOffset] = useState(() =>
+    initial?.weekStart ? Math.min(0, Math.round(diffDays(initial.weekStart, weekOf(today)) / 7)) : 0,
+  );
+  const [dayIdx, setDayIdx] = useState(() => weekdayIndex(initial?.day ?? today));
   const [pairId, setPairId] = useState<string | null>(null);
 
   // Your own shared days come from this device so changes show instantly.
