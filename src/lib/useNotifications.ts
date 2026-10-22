@@ -86,11 +86,12 @@ export function useNotifications(userId: string | undefined, leagues: League[], 
               name: "You",
               you: true,
               avatarUrl: null,
+              joinedAt: others.myJoinedAt,
               entries: Object.fromEntries(Object.entries(my.entries).filter(([d]) => (my.shared[d] ?? []).includes(l.id))),
               updatedAt: {},
             };
             const rules = normalizeRules(l.scoring);
-            const scored = [...others.map((o) => ({ id: o.id, name: o.name, you: false, avatarUrl: o.avatarUrl, entries: o.entries, updatedAt: o.updatedAt })), me].map((m) => scoreMember(m, rules));
+            const scored = [...others.map((o) => ({ id: o.id, name: o.name, you: false, avatarUrl: o.avatarUrl, joinedAt: o.joinedAt || undefined, entries: o.entries, updatedAt: o.updatedAt })), me].map((m) => scoreMember(m, rules));
             text = matchupResultText(scored, lastWeek) ?? "";
             try {
               window.localStorage.setItem(resultKey(userId, l.id, lastWeek), text);

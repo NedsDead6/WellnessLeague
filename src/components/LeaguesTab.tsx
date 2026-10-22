@@ -204,12 +204,13 @@ function LeagueView({
       name: "You",
       you: true,
       avatarUrl,
+      joinedAt: data.myJoinedAt,
       entries: Object.fromEntries(Object.entries(entries).filter(([day]) => (shared[day] ?? []).includes(league.id))),
       updatedAt: Object.fromEntries(Object.entries(updatedAt).filter(([day]) => (shared[day] ?? []).includes(league.id))),
     };
-    const others: LeagueMember[] = data.others.map((o) => ({ id: o.id, name: o.name, you: false, avatarUrl: o.avatarUrl, entries: o.entries, updatedAt: o.updatedAt }));
+    const others: LeagueMember[] = data.others.map((o) => ({ id: o.id, name: o.name, you: false, avatarUrl: o.avatarUrl, joinedAt: o.joinedAt || undefined, entries: o.entries, updatedAt: o.updatedAt }));
     return [...others, mine].map((m) => scoreMember(m, rules));
-  }, [data.others, entries, shared, updatedAt, avatarUrl, league.id, userId, rules]);
+  }, [data.others, data.myJoinedAt, entries, shared, updatedAt, avatarUrl, league.id, userId, rules]);
 
   const currentWeek = weekOf(today);
   const weekStart = addDays(currentWeek, offset * 7);

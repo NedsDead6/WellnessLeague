@@ -16,6 +16,8 @@ export interface LeagueMember {
   entries: Record<string, DayEntry>;
   /** When each of those days was last saved (ISO time), where known. */
   updatedAt?: Record<string, string>;
+  /** When this person joined the league (ISO time). Missing means from the start. */
+  joinedAt?: string;
 }
 
 export interface ScoredMember extends LeagueMember {
@@ -99,13 +101,32 @@ export interface Matchup {
   bPoints: number;
 }
 
+const joinWeek = (m: LeagueMember) => (m.joinedAt ? weekOf(m.joinedAt.slice(0, 10)) : "");
+
+/**
+ * Who is scheduled in a given week. Someone who joins part way through a week starts the next
+ * week, so adding a member never changes a week that has already begun. (A brand new league,
+ * with fewer than two members before this week, starts right away.)
+ */
+export function scheduledMembers(members: ScoredMember[], weekStart: string): ScoredMember[] {
+  const before = members.filter((m) => joinWeek(m) < weekStart);
+  return before.length >= 2 ? before : members.filter((m) => joinWeek(m) <= weekStart);
+}
+
 export function weekMatchups(members: ScoredMember[], weekStart: string): Matchup[] {
-  const byId = new Map(members.map((m) => [m.id, m]));
+  const present = members.filter((m) => joinWeek(m) <= weekStart);
+  const scheduled = scheduledMembers(members, weekStart);
+  const byId = new Map(present.map((m) => [m.id, m]));
   const days = weekDays(weekStart);
-  return pairings(
-    members.map((m) => m.id),
-    weekStart,
-  ).map((p) => {
+  // People who joined this week sit out until the next one; their points still count for the season.
+  const waiting: Pairing[] = present.filter((m) => !scheduled.includes(m)).map((m) => ({ a: m.id, b: null }));
+  return [
+    ...pairings(
+      scheduled.map((m) => m.id),
+      weekStart,
+    ),
+    ...waiting,
+  ].map((p) => {
     const a = byId.get(p.a)!;
     const b = p.b ? byId.get(p.b)! : null;
     return {

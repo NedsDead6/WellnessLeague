@@ -345,3 +345,26 @@ describe("matchup result", () => {
     expect(matchupResultText([mk("a", "Sam", false, 0), mk("b", "Me", true, 0)], "2026-10-12")).toBeNull();
   });
 });
+
+describe("joining mid-league", () => {
+  const mk = (id: string, joinedAt?: string) =>
+    scoreMember({ id, name: id, you: false, entries: {}, updatedAt: {}, joinedAt }, DEFAULT_RULES);
+  const key = (ms: ReturnType<typeof mk>[], week: string) =>
+    weekMatchups(ms, week).map((m) => `${m.a.id}-${m.b?.id ?? "rest"}`).sort().join(",");
+
+  it("leaves every week that has started untouched and brings the newcomer in the next week", () => {
+    const start = [mk("a", "2026-09-01T10:00:00Z"), mk("b", "2026-09-01T10:00:00Z"), mk("c", "2026-09-02T10:00:00Z"), mk("d", "2026-09-02T10:00:00Z")];
+    const withNew = [...start, mk("e", "2026-10-14T10:00:00Z")]; // joins Wednesday of the week of Oct 12
+    for (const week of ["2026-09-07", "2026-09-14", "2026-10-05", "2026-10-12"]) {
+      expect(key(withNew, week).replace(/,?e-rest/, "")).toBe(key(start, week));
+    }
+    expect(key(withNew, "2026-10-12")).toContain("e-rest"); // waits out the week it joined
+    expect(key(withNew, "2026-10-19")).toMatch(/e-|-e/); // plays from the following week
+    expect(key(withNew, "2026-10-19")).not.toContain("e-rest");
+  });
+
+  it("starts a brand new league straight away", () => {
+    const fresh = [mk("a", "2026-10-13T10:00:00Z"), mk("b", "2026-10-14T10:00:00Z")];
+    expect(key(fresh, "2026-10-12")).toMatch(/a-b|b-a/);
+  });
+});

@@ -19,7 +19,7 @@ export interface OtherMember {
 }
 
 /** The other members of a league and every day they shared with it. */
-export async function fetchOthers(client: NonNullable<typeof supabase>, leagueId: string, userId: string): Promise<OtherMember[]> {
+export async function fetchOthers(client: NonNullable<typeof supabase>, leagueId: string, userId: string): Promise<OtherMember[] & { myJoinedAt?: string }> {
   let roster: { data: any[] | null; error: { message: string } | null } = await client
     .from("league_members")
     .select("user_id, joined_at, profiles(display_name, avatar_url)")
@@ -70,7 +70,9 @@ export async function fetchOthers(client: NonNullable<typeof supabase>, leagueId
     }
   }
 
-  return others.map((m) => ({ ...m, entries: byUser.get(m.id) ?? {}, updatedAt: stamps.get(m.id) ?? {} }));
+  const result: OtherMember[] & { myJoinedAt?: string } = others.map((m) => ({ ...m, entries: byUser.get(m.id) ?? {}, updatedAt: stamps.get(m.id) ?? {} }));
+  result.myJoinedAt = members.find((m) => m.id === userId)?.joinedAt || undefined;
+  return result;
 }
 
 /**
@@ -80,6 +82,7 @@ export async function fetchOthers(client: NonNullable<typeof supabase>, leagueId
  */
 export function useLeagueData(leagueId: string | undefined, userId: string | undefined) {
   const [others, setOthers] = useState<OtherMember[]>([]);
+  const [myJoinedAt, setMyJoinedAt] = useState<string | undefined>(undefined);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -116,6 +119,7 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
       if (challengeRows.error) throw new Error(challengeRows.error.message);
 
       setOthers(othersFull);
+      setMyJoinedAt(othersFull.myJoinedAt);
       setReactions(reactionRows as Reaction[]);
       setPosts(postRows.error ? [] : ((postRows.data ?? []) as unknown as Post[]));
       setFeedReactions(feedReactionRows.error ? [] : ((feedReactionRows.data ?? []) as unknown as FeedReaction[]));
@@ -215,5 +219,5 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
     [leagueId, userId, feedReactions],
   );
 
-  return { others, reactions, challenges, posts, feedReactions, toggleFeedReaction, loaded, error, reload: load, toggleReaction, addPost, deletePost };
+  return { others, myJoinedAt, reactions, challenges, posts, feedReactions, toggleFeedReaction, loaded, error, reload: load, toggleReaction, addPost, deletePost };
 }
