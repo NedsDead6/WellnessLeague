@@ -18,6 +18,61 @@ export interface OtherMember {
   updatedAt: Record<string, string>;
 }
 
+/** The other members of a league and every day they shared with it. */
+export async function fetchOthers(client: NonNullable<typeof supabase>, leagueId: string, userId: string): Promise<OtherMember[]> {
+  let roster: { data: any[] | null; error: { message: string } | null } = await client
+    .from("league_members")
+    .select("user_id, joined_at, profiles(display_name, avatar_url)")
+    .eq("league_id", leagueId);
+  // Before the photo migration is run the column is missing; load the roster without photos instead.
+  if (roster.error && /avatar_url/.test(roster.error.message))
+    roster = await client.from("league_members").select("user_id, joined_at, profiles(display_name)").eq("league_id", leagueId);
+  if (roster.error) throw new Error(roster.error.message);
+  const members = ((roster.data ?? []) as any[]).map((row) => {
+    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    return {
+      id: row.user_id as string,
+      name: (profile?.display_name as string | undefined) ?? "Member",
+      joinedAt: (row.joined_at as string | undefined) ?? "",
+      avatarUrl: (profile?.avatar_url as string | null | undefined) ?? null,
+    };
+  });
+  const others = members.filter((m) => m.id !== userId);
+
+  const shares = await fetchAll((from, to) =>
+    client.from("entry_leagues").select("user_id, day").eq("league_id", leagueId).order("day").range(from, to),
+  );
+  const sharedKeys = new Set(shares.map((row) => `${row.user_id}|${row.day}`));
+  const otherIds = new Set(others.map((m) => m.id));
+  const firstDay = shares.filter((row) => otherIds.has(row.user_id)).map((row) => row.day as string).sort()[0];
+
+  const byUser = new Map<string, Record<string, DayEntry>>();
+  const stamps = new Map<string, Record<string, string>>();
+  if (others.length > 0 && firstDay) {
+    const rows = await fetchAll((from, to) =>
+      client
+        .from("daily_entries")
+        .select("user_id, day, entry, updated_at")
+        .in(
+          "user_id",
+          others.map((m) => m.id),
+        )
+        .gte("day", firstDay)
+        .order("day")
+        .range(from, to),
+    );
+    for (const row of rows) {
+      if (!sharedKeys.has(`${row.user_id}|${row.day}`)) continue;
+      const days = byUser.get(row.user_id) ?? {};
+      days[row.day as string] = normalizeEntry(row.entry);
+      byUser.set(row.user_id, days);
+      if (row.updated_at) stamps.set(row.user_id, { ...(stamps.get(row.user_id) ?? {}), [row.day as string]: row.updated_at as string });
+    }
+  }
+
+  return others.map((m) => ({ ...m, entries: byUser.get(m.id) ?? {}, updatedAt: stamps.get(m.id) ?? {} }));
+}
+
 /**
  * Everything about one league beyond the signed-in person's own days: the
  * other members and every day they shared with it, plus reactions and the
@@ -41,56 +96,7 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
     const client = supabase;
     setLoaded(false);
     try {
-      let roster: { data: any[] | null; error: { message: string } | null } = await client
-        .from("league_members")
-        .select("user_id, joined_at, profiles(display_name, avatar_url)")
-        .eq("league_id", leagueId);
-      // Before the photo migration is run the column is missing; load the roster without photos instead.
-      if (roster.error && /avatar_url/.test(roster.error.message))
-        roster = await client.from("league_members").select("user_id, joined_at, profiles(display_name)").eq("league_id", leagueId);
-      if (roster.error) throw new Error(roster.error.message);
-      const members = ((roster.data ?? []) as any[]).map((row) => {
-        const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-        return {
-          id: row.user_id as string,
-          name: (profile?.display_name as string | undefined) ?? "Member",
-          joinedAt: (row.joined_at as string | undefined) ?? "",
-          avatarUrl: (profile?.avatar_url as string | null | undefined) ?? null,
-        };
-      });
-      const others = members.filter((m) => m.id !== userId);
-
-      const shares = await fetchAll((from, to) =>
-        client.from("entry_leagues").select("user_id, day").eq("league_id", leagueId).order("day").range(from, to),
-      );
-      const sharedKeys = new Set(shares.map((row) => `${row.user_id}|${row.day}`));
-      const otherIds = new Set(others.map((m) => m.id));
-      const firstDay = shares.filter((row) => otherIds.has(row.user_id)).map((row) => row.day as string).sort()[0];
-
-      const byUser = new Map<string, Record<string, DayEntry>>();
-      const stamps = new Map<string, Record<string, string>>();
-      if (others.length > 0 && firstDay) {
-        const rows = await fetchAll((from, to) =>
-          client
-            .from("daily_entries")
-            .select("user_id, day, entry, updated_at")
-            .in(
-              "user_id",
-              others.map((m) => m.id),
-            )
-            .gte("day", firstDay)
-            .order("day")
-            .range(from, to),
-        );
-        for (const row of rows) {
-          if (!sharedKeys.has(`${row.user_id}|${row.day}`)) continue;
-          const days = byUser.get(row.user_id) ?? {};
-          days[row.day as string] = normalizeEntry(row.entry);
-          byUser.set(row.user_id, days);
-          if (row.updated_at) stamps.set(row.user_id, { ...(stamps.get(row.user_id) ?? {}), [row.day as string]: row.updated_at as string });
-        }
-      }
-
+      const othersFull = await fetchOthers(client, leagueId, userId);
       const reactionRows = await fetchAll((from, to) =>
         client.from("league_reactions").select("id, league_id, target_user_id, day, reactor_id, emoji, created_at").eq("league_id", leagueId).order("created_at").range(from, to),
       );
@@ -109,7 +115,7 @@ export function useLeagueData(leagueId: string | undefined, userId: string | und
       const challengeRows = await client.from("league_challenges").select("id, metric, target, week_start").eq("league_id", leagueId);
       if (challengeRows.error) throw new Error(challengeRows.error.message);
 
-      setOthers(others.map((m) => ({ ...m, entries: byUser.get(m.id) ?? {}, updatedAt: stamps.get(m.id) ?? {} })));
+      setOthers(othersFull);
       setReactions(reactionRows as Reaction[]);
       setPosts(postRows.error ? [] : ((postRows.data ?? []) as unknown as Post[]));
       setFeedReactions(feedReactionRows.error ? [] : ((feedReactionRows.data ?? []) as unknown as FeedReaction[]));

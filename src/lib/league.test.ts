@@ -330,3 +330,18 @@ describe("notifications", () => {
     expect(unreadCount(items, "2026-10-21T10:00:00Z")).toBe(0);
   });
 });
+
+import { matchupResultText } from "./notifications";
+
+describe("matchup result", () => {
+  it("says who won, or nothing when nobody shared that week", () => {
+    const day = "2026-10-14";
+    const mk = (id: string, name: string, you: boolean, steps: number): ReturnType<typeof scoreMember> =>
+      scoreMember({ id, name, you, avatarUrl: null, entries: steps ? { [day]: { ...EMPTY_DAY, steps } } : {}, updatedAt: {} }, DEFAULT_RULES);
+    const win = matchupResultText([mk("a", "Sam Lee", false, 4000), mk("b", "Me", true, 9000)], "2026-10-12");
+    expect(win).toMatch(/^You beat Sam /);
+    const loss = matchupResultText([mk("a", "Sam Lee", false, 14000), mk("b", "Me", true, 1000)], "2026-10-12");
+    expect(loss).toMatch(/^You lost to Sam /);
+    expect(matchupResultText([mk("a", "Sam", false, 0), mk("b", "Me", true, 0)], "2026-10-12")).toBeNull();
+  });
+});

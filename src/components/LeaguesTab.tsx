@@ -190,7 +190,7 @@ function LeagueView({
   const data = useLeagueData(league.id, userId);
   const rules = useMemo(() => normalizeRules(league.scoring), [league.scoring]);
 
-  const [mode, setMode] = useState<Mode>("day");
+  const [mode, setMode] = useState<Mode>(initial?.section === "matchups" && initial.weekStart && !initial.day ? "week" : "day");
   const [offset, setOffset] = useState(() =>
     initial?.weekStart ? Math.min(0, Math.round(diffDays(initial.weekStart, weekOf(today)) / 7)) : 0,
   );

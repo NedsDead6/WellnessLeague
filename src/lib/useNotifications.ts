@@ -1,9 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buildNotifications, unreadCount, type Notif, type NotifInput } from "./notifications";
+import { buildNotifications, matchupResultText, unreadCount, type Notif, type NotifInput } from "./notifications";
 import { supabase } from "./supabase";
 import type { League } from "./types";
+import { addDays, periodStart } from "./dates";
+import { scoreMember, type LeagueMember } from "./league";
+import { normalizeRules } from "./scoring";
+import type { EntryMap } from "./history";
+import { fetchOthers } from "./useLeagueData";
 
 const POLL_MS = 60_000;
 const key = (userId: string) => `wl:notif-read:${userId}`;
@@ -22,7 +27,16 @@ function loadRead(userId: string): string {
 }
 
 /** In-app notifications across all of the person's leagues, with a count of unread ones. */
-export function useNotifications(userId: string | undefined, leagues: League[], today: string) {
+export interface MyData {
+  ready: boolean;
+  entries: EntryMap;
+  shared: Record<string, string[]>;
+  updatedAt: Record<string, string>;
+}
+
+const resultKey = (userId: string, leagueId: string, week: string) => `wl:notif-result:${userId}:${leagueId}:${week}`;
+
+export function useNotifications(userId: string | undefined, leagues: League[], today: string, my: MyData) {
   const [items, setItems] = useState<Notif[]>([]);
   const [readAt, setReadAt] = useState<string>("");
 
@@ -53,7 +67,45 @@ export function useNotifications(userId: string | undefined, leagues: League[], 
         const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
         names[row.user_id] = profile?.display_name ?? "Someone";
       }
+      // Last week's matchup result: worked out once per league and week, then remembered.
+      const lastWeek = addDays(periodStart(today, "week"), -7);
+      const results: NonNullable<NotifInput["results"]> = [];
+      for (const l of leagues) {
+        if (l.created_at && l.created_at.slice(0, 10) >= periodStart(today, "week")) continue;
+        let text: string | null = null;
+        try {
+          text = window.localStorage.getItem(resultKey(userId, l.id, lastWeek));
+        } catch {
+          text = null;
+        }
+        if (text === null && my.ready) {
+          try {
+            const others = await fetchOthers(client, l.id, userId);
+            const me: LeagueMember = {
+              id: userId,
+              name: "You",
+              you: true,
+              avatarUrl: null,
+              entries: Object.fromEntries(Object.entries(my.entries).filter(([d]) => (my.shared[d] ?? []).includes(l.id))),
+              updatedAt: {},
+            };
+            const rules = normalizeRules(l.scoring);
+            const scored = [...others.map((o) => ({ id: o.id, name: o.name, you: false, avatarUrl: o.avatarUrl, entries: o.entries, updatedAt: o.updatedAt })), me].map((m) => scoreMember(m, rules));
+            text = matchupResultText(scored, lastWeek) ?? "";
+            try {
+              window.localStorage.setItem(resultKey(userId, l.id, lastWeek), text);
+            } catch {
+              // Worked out again next time.
+            }
+          } catch {
+            text = null;
+          }
+        }
+        if (text) results.push({ leagueId: l.id, weekStart: lastWeek, text });
+      }
+
       const input: NotifInput = {
+        results,
         userId,
         today,
         leagues,
@@ -68,7 +120,7 @@ export function useNotifications(userId: string | undefined, leagues: League[], 
       // Notifications are a convenience; keep whatever we had.
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, today, leagueKey]);
+  }, [userId, today, leagueKey, my.ready]);
 
   useEffect(() => {
     void refresh();

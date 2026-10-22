@@ -1,5 +1,7 @@
 import { addDays, periodLabel, periodStart } from "./dates";
 
+import { totalsFor, weekDays, weekMatchups, type ScoredMember } from "./league";
+
 const weekOf = (day: string) => periodStart(day, "week");
 
 export interface NotifTarget {
@@ -33,6 +35,27 @@ export interface NotifInput {
   myPosts: { id: string; body: string }[];
   /** Posts people other than you wrote. */
   posts: { id: string; league_id: string; user_id: string; body: string; created_at: string }[];
+  /** Your finished matchups, already worked out (see matchupResultText). */
+  results?: { leagueId: string; weekStart: string; text: string }[];
+}
+
+const r1 = (n: number) => String(Math.round(n * 10) / 10);
+
+/** One line about how your matchup went, or null if you had no matchup or nobody shared anything that week. */
+export function matchupResultText(members: ScoredMember[], weekStart: string): string | null {
+  const mine = weekMatchups(members, weekStart).find((m) => m.a.you || m.b?.you);
+  if (!mine) return null;
+  const days = weekDays(weekStart);
+  const anyData = [mine.a, mine.b].some((m) => m && totalsFor(m, days).shared > 0);
+  if (!anyData) return null;
+  const meIsA = mine.a.you;
+  const me = meIsA ? mine.aPoints : mine.bPoints;
+  const opp = meIsA ? mine.bPoints : mine.aPoints;
+  const other = meIsA ? mine.b : mine.a;
+  if (!other) return `Your rest week is done: ${r1(me)} points`;
+  const first = other.name.split(" ")[0];
+  if (me === opp) return `You tied ${first} ${r1(me)}–${r1(opp)}`;
+  return me > opp ? `You beat ${first} ${r1(me)}–${r1(opp)}` : `You lost to ${first} ${r1(me)}–${r1(opp)}`;
 }
 
 const clip = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
@@ -104,6 +127,18 @@ export function buildNotifications(input: NotifInput): Notif[] {
       at: `${thisWeek}T00:00:00`,
       text: `Week of ${periodLabel(lastWeek, "week")} is final. See the awards`,
       target: { section: "awards", weekStart: lastWeek },
+    });
+  }
+
+  for (const r of input.results ?? []) {
+    out.push({
+      id: `m-${r.leagueId}-${r.weekStart}`,
+      kind: "week",
+      leagueId: r.leagueId,
+      leagueName: leagueName(r.leagueId),
+      at: `${thisWeek}T00:00:01`,
+      text: `Matchup result: ${r.text}`,
+      target: { section: "matchups", weekStart: r.weekStart },
     });
   }
 

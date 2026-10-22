@@ -99,7 +99,7 @@ export function App() {
     return parts.length > 0 ? `${parts.join(". ")}, using that league's own scoring.` : null;
   }, [entry, rules, leagues, selectedLeagueIds]);
   const streak = useMemo(() => (today ? currentStreak(entries, today) : 0), [entries, today]);
-  const notes = useNotifications(userId, leagues, today);
+  const notes = useNotifications(userId, leagues, today, { ready: loaded, entries, shared, updatedAt });
   const [notifOpen, setNotifOpen] = useState(false);
   const [newSince, setNewSince] = useState("");
   const [leagueTarget, setLeagueTarget] = useState<{ leagueId: string; nonce: number; target: NotifTarget } | null>(null);
