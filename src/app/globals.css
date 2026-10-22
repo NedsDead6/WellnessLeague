@@ -2466,3 +2466,204 @@ button:focus-visible {
   font-size: 16px;
   font-weight: 700;
 }
+
+/* Quick log, pinned total, this-week card, personal views, reaction pop */
+.quick-log {
+  width: 100%;
+  min-height: 68px;
+  padding: 10px 16px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #2f6bff 0%, #2342a8 100%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  box-shadow: 0 8px 24px rgba(47, 107, 255, 0.35);
+  text-align: left;
+}
+
+.ql-main {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.ql-sub {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.step-or {
+  text-align: center;
+  margin: 12px 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.pin-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  height: 0;
+  pointer-events: none;
+}
+
+.pin-bar {
+  position: absolute;
+  left: -16px;
+  right: -16px;
+  top: 0;
+  height: 46px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(13, 22, 48, 0.96);
+  border-bottom: 1px solid var(--line-strong);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transform: translateY(-100%);
+  opacity: 0;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.pin-wrap.on {
+  pointer-events: auto;
+}
+
+.pin-wrap.on .pin-bar {
+  transform: none;
+  opacity: 1;
+}
+
+.pin-wrap.on ~ .group-head {
+  top: 46px;
+}
+
+.pin-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pin-total {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pin-pills {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes flash-glow {
+  0% { transform: scale(1); color: inherit; }
+  35% { transform: scale(1.18); color: #7dffb0; text-shadow: 0 0 22px rgba(43, 255, 136, 0.9); }
+  100% { transform: scale(1); color: inherit; }
+}
+
+.hero-total.flash,
+.pin-bar.flash .pin-total {
+  display: inline-block;
+  transform-origin: left center;
+  animation: flash-glow 0.7s ease;
+}
+
+.hero-total.flash {
+  display: block;
+}
+
+.week-summary {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "kicker scores" "title scores" "line scores";
+  align-items: center;
+  column-gap: 12px;
+  text-align: left;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  border-radius: 16px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+}
+
+.week-summary.lead { border-color: var(--physical); background: var(--physical-tint); }
+.week-summary.trail { border-color: var(--penalty); background: rgba(255, 77, 109, 0.1); }
+
+.ws-kicker {
+  grid-area: kicker;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ws-title {
+  grid-area: title;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.ws-line {
+  grid-area: line;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.ws-scores {
+  grid-area: scores;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ws-dash { color: var(--muted); font-size: 22px; }
+
+.seg.views button {
+  font-size: 13px;
+  padding: 0 4px;
+}
+
+.seg.small.wide {
+  width: 100%;
+}
+
+@keyframes chip-pop {
+  0% { transform: scale(0.6); }
+  55% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+.emoji-chip[aria-pressed="true"] {
+  animation: chip-pop 0.35s ease;
+}
+
+.emoji-chip.add:not(.pick) {
+  transition: transform 0.15s ease;
+}
+
+.emoji-chip.add[aria-expanded="true"] {
+  transform: rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .emoji-chip[aria-pressed="true"],
+  .hero-total.flash,
+  .pin-bar.flash .pin-total {
+    animation: none;
+  }
+}

@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { GROUP_COLORS } from "@/lib/colors";
 import { EMOJIS, QUICK_EMOJIS } from "@/lib/emojis";
-import { dayLong, dayOfMonth, dayShortWeekday, periodLabel } from "@/lib/dates";
+import { dayLong, dayOfMonth, dayShortWeekday, periodLabel, weekdayIndex } from "@/lib/dates";
 import {
   challengeProgress,
   challengeTitle,
@@ -169,8 +169,41 @@ export function StandingsSection({
     marked: m.you,
   }));
 
+  const mine = matchups.find((m) => m.a.you || m.b?.you);
+  const daysLeft = 6 - weekdayIndex(today);
+  type WeekSummary = { title: string; line: string; tone: "lead" | "trail" | "tie" | "rest"; me: number; opp: number | null };
+  let sm: WeekSummary | null = null;
+  if (mine && weekStart === currentWeek) {
+    const meIsA = mine.a.you;
+    const me = meIsA ? mine.aPoints : mine.bPoints;
+    const opp = meIsA ? mine.bPoints : mine.aPoints;
+    const oppName = meIsA ? mine.b?.name : mine.a.name;
+    const left = daysLeft === 0 ? "last day" : `${daysLeft} ${daysLeft === 1 ? "day" : "days"} left`;
+    if (!oppName) sm = { title: "Rest week", line: `${fmt(round1(me))} points so far, ${left}`, tone: "rest", me, opp: null };
+    else if (me === opp) sm = { title: `You vs ${oppName}`, line: `Tied, ${left}`, tone: "tie", me, opp };
+    else if (me > opp) sm = { title: `You vs ${oppName}`, line: `You lead by ${fmt(round1(me - opp))}, ${left}`, tone: "lead", me, opp };
+    else sm = { title: `You vs ${oppName}`, line: `You trail by ${fmt(round1(opp - me))}, ${left}`, tone: "trail", me, opp };
+  }
+
   return (
     <>
+      {sm && mine && (
+        <button type="button" className={`week-summary ${sm.tone}`} onClick={() => onOpenMatchup(mine.a.id)} aria-label={`This week: ${sm.title}. ${sm.line}. Open matchup`}>
+          <span className="ws-kicker">This week</span>
+          <span className="ws-title">{sm.title}</span>
+          <span className="ws-scores">
+            <strong>{fmt(round1(sm.me))}</strong>
+            {sm.opp !== null && (
+              <>
+                <span className="ws-dash">–</span>
+                <strong>{fmt(round1(sm.opp))}</strong>
+              </>
+            )}
+          </span>
+          <span className="ws-line">{sm.line}</span>
+        </button>
+      )}
+
       <section aria-label="Matchup scores">
         <div className="group-head">
           <span className="name">{live ? "This week's matchups" : "Matchups that week"}</span>

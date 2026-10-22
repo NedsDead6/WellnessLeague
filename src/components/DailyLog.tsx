@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GROUP_COLORS, tint } from "@/lib/colors";
 import { addDays, dayOfMonth, dayShortWeekday, dayLong } from "@/lib/dates";
 import { isLogged, type EntryMap } from "@/lib/history";
@@ -80,6 +80,20 @@ const GROUPS: { id: Group; title: string; color: string; fields: StepperRow[] }[
 
 const MEALS = ["Breakfast", "Lunch", "Dinner"];
 
+/** True for a moment after the value changes, so the number can briefly glow. */
+function useFlash(value: number): boolean {
+  const [on, setOn] = useState(false);
+  const prev = useRef(value);
+  useEffect(() => {
+    if (prev.current === value) return;
+    prev.current = value;
+    setOn(true);
+    const t = setTimeout(() => setOn(false), 700);
+    return () => clearTimeout(t);
+  }, [value]);
+  return on;
+}
+
 export const fmt = (n: number) => String(Number(n.toFixed(2)));
 export const fmtSigned = (n: number) => (n === 0 ? "0" : `${n > 0 ? "+" : "-"}${fmt(Math.abs(n))}`);
 
@@ -142,6 +156,16 @@ export function DailyLog({
   onOpenScoring,
 }: Props) {
   const maxes = pillarMax(rules);
+  const heroRef = useRef<HTMLElement | null>(null);
+  const [heroSeen, setHeroSeen] = useState(true);
+  useEffect(() => {
+    const el = heroRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setHeroSeen(e.isIntersecting), { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [step]);
+  const flash = useFlash(score.total);
   const groupTotal: Record<Group, number> = {
     physical: score.physical,
     mental: score.mental,
@@ -171,13 +195,21 @@ export function DailyLog({
   const heading = day === today ? "Today's points" : `Points for ${dayLong(day)}`;
 
   if (step === 0) {
+    const names = leagues.filter((l) => suggestedLeagueIds.includes(l.id)).map((l) => l.name);
     return (
-      <DestinationPrompt
-        leagues={leagues}
-        selected={suggestedLeagueIds}
-        onChange={onSuggestLeagues}
-        onContinue={() => onStep(1)}
-      />
+      <>
+        <button type="button" className="quick-log" onClick={() => onPickDay(today)}>
+          <span className="ql-main">Log today</span>
+          <span className="ql-sub">{names.length === 0 ? "Personal only" : `Personal + ${names.join(", ")}`}</span>
+        </button>
+        <p className="step-or">or choose where and when</p>
+        <DestinationPrompt
+          leagues={leagues}
+          selected={suggestedLeagueIds}
+          onChange={onSuggestLeagues}
+          onContinue={() => onStep(1)}
+        />
+      </>
     );
   }
 
@@ -218,9 +250,23 @@ export function DailyLog({
         </button>
       </div>
 
-      <section className="hero" aria-label={heading}>
+      <div className={`pin-wrap ${heroSeen ? "" : "on"}`}>
+        <div className={`pin-bar ${flash ? "flash" : ""}`} aria-hidden={heroSeen}>
+          <span className="pin-label">{day === today ? "Today" : dayShortWeekday(day)}</span>
+          <strong className="pin-total">{fmt(score.total)}</strong>
+          <span className="pin-pills">
+            {pillars.map((p) => (
+              <span key={p.name} style={{ color: p.color }}>
+                {p.name[0]} {fmtSigned(p.pts)}
+              </span>
+            ))}
+          </span>
+        </div>
+      </div>
+
+      <section className="hero" aria-label={heading} ref={heroRef}>
         <div className="hero-label">{heading}</div>
-        <div className="hero-total">{fmt(score.total)}</div>
+        <div className={`hero-total ${flash ? "flash" : ""}`}>{fmt(score.total)}</div>
         {pillars.map((p) => (
           <div className="pillar-row" key={p.name}>
             <span>{p.name}</span>

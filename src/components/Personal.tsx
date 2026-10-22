@@ -48,13 +48,18 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export function Personal({ entries, today, rules }: { entries: EntryMap; today: string; rules: ScoringRules }) {
   const history = useMemo(() => scoreHistory(entries, rules), [entries, rules]);
-  const [period, setPeriod] = useState<Period>("day");
+  const [view, setView] = useState<"week" | "history" | "calendar" | "metrics">("week");
+  const [histPeriod, setHistPeriod] = useState<Period>("week");
+  // "This week" summarises the week and charts it day by day; "History" lets you pick the span.
+  const period: Period = view === "week" ? "week" : histPeriod;
+  const chartPeriod: Period = view === "week" ? "day" : histPeriod;
 
-  const config = PERIODS.find((p) => p.id === period) ?? PERIODS[0];
+  const config = PERIODS.find((p) => p.id === chartPeriod) ?? PERIODS[0];
   const currentStart = periodStart(today, period);
   const anchor = currentStart;
   const anchorEnd = periodEnd(anchor, period);
   const previous = shiftPeriod(anchor, period, -1);
+  const chartAnchor = periodStart(today, chartPeriod);
 
   const now = useMemo(() => totalsBetween(history, anchor, anchorEnd), [history, anchor, anchorEnd]);
   const before = useMemo(
@@ -66,11 +71,11 @@ export function Personal({ entries, today, rules }: { entries: EntryMap; today: 
     [history, anchor, anchorEnd],
   );
   const series = useMemo(
-    () => averageSeries(history, period, anchor, config.count),
-    [history, period, anchor, config.count],
+    () => averageSeries(history, chartPeriod, chartAnchor, config.count),
+    [history, chartPeriod, chartAnchor, config.count],
   );
 
-  const choosePeriod = (next: Period) => setPeriod(next);
+  const choosePeriod = (next: Period) => setHistPeriod(next);
 
   if (history.length === 0) {
     return (
@@ -80,37 +85,57 @@ export function Personal({ entries, today, rules }: { entries: EntryMap; today: 
     );
   }
 
+  const VIEWS = [
+    { id: "week", label: "This week" },
+    { id: "history", label: "History" },
+    { id: "calendar", label: "Calendar" },
+    { id: "metrics", label: "Trends" },
+  ] as const;
+
   return (
     <>
-      <div className="seg" role="group" aria-label="Trend by">
-        {PERIODS.map((p) => (
-          <button key={p.id} aria-pressed={period === p.id} onClick={() => choosePeriod(p.id)}>
-            {p.label}
+      <div className="seg views" role="group" aria-label="Personal view">
+        {VIEWS.map((v) => (
+          <button key={v.id} aria-pressed={view === v.id} onClick={() => setView(v.id)}>
+            {v.label}
           </button>
         ))}
       </div>
 
-      <Summary
-        period={period}
-        now={now}
-        before={before}
-        best={best}
-        length={diffDays(anchorEnd, anchor) + 1}
-        previousLabel={periodLabel(previous, period)}
-        partial={period !== "day"}
-      />
+      {(view === "week" || view === "history") && (
+        <>
+          {view === "history" && (
+            <div className="seg small wide" role="group" aria-label="Trend by">
+              {PERIODS.filter((p) => p.id !== "day").map((p) => (
+                <button key={p.id} aria-pressed={histPeriod === p.id} onClick={() => choosePeriod(p.id)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          )}
 
-      <section aria-label="Trend">
-        <div className="group-head">
-          <span className="name">{config.title}</span>
-          {period !== "day" && <span className="sum">per logged day</span>}
-        </div>
-        <TrendChart series={series} period={period} selectedStart={anchor} title={config.title} slot={config.slot} />
-      </section>
+          <Summary
+            period={period}
+            now={now}
+            before={before}
+            best={best}
+            length={diffDays(anchorEnd, anchor) + 1}
+            previousLabel={periodLabel(previous, period)}
+            partial={period !== "day"}
+          />
 
-      <Calendar history={history} today={today} />
+          <section aria-label="Trend">
+            <div className="group-head">
+              <span className="name">{config.title}</span>
+              {chartPeriod !== "day" && <span className="sum">per logged day</span>}
+            </div>
+            <TrendChart series={series} period={chartPeriod} selectedStart={chartAnchor} title={config.title} slot={config.slot} />
+          </section>
+        </>
+      )}
 
-      <MetricTrends entries={entries} today={today} />
+      {view === "calendar" && <Calendar history={history} today={today} />}
+      {view === "metrics" && <MetricTrends entries={entries} today={today} />}
     </>
   );
 }
